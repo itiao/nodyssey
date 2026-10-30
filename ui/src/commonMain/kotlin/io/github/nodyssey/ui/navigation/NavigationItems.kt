@@ -42,10 +42,12 @@ import androidx.navigation3.runtime.NavKey
 import io.github.nodyssey.NotificationsKey
 import io.github.nodyssey.PostListKey
 import io.github.nodyssey.ProfileKey
+import io.github.nodyssey.ui.postlist.HomeAccount
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.tab_home
 import io.github.nodyssey.ui.resources.tab_notifications
 import io.github.nodyssey.ui.resources.tab_profile
+import io.github.plaza.designsys.component.UserAvatar
 import io.github.plaza.designsys.theme.LocalPlazaLayers
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -104,6 +106,8 @@ fun NodysseyBottomBar(
     // v1 does not read notifications yet, so this is always zero — the slot exists so that turning
     // them on later is a data change rather than a layout change.
     unreadCount: Int = 0,
+    /** The signed-in face 我的 draws in place of its glyph, and null while signed out. */
+    account: HomeAccount? = null,
 ) {
     Surface(color = LocalPlazaLayers.current.card, modifier = modifier.fillMaxWidth()) {
         Row(
@@ -120,6 +124,7 @@ fun NodysseyBottomBar(
                     destination = destination,
                     selected = destination == current,
                     unreadCount = unreadCount,
+                    account = account,
                     onClick = { onSelect(destination) },
                     modifier = Modifier.weight(1f),
                 )
@@ -134,6 +139,7 @@ private fun BottomBarItem(
     destination: TopLevelDestination,
     selected: Boolean,
     unreadCount: Int,
+    account: HomeAccount?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -157,18 +163,29 @@ private fun BottomBarItem(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = if (selected) destination.selectedIcon else destination.icon,
-                // The item above carries the name; describing the glyph again says it twice.
-                contentDescription = null,
-                tint =
-                if (selected) {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(NavigationIconSize),
-            )
+            // 我的 draws the account's own face, the way the home bar used to. It is the one tab
+            // whose glyph can say *which* account, and the picture is what the reader recognises;
+            // the person outline stays for a signed-out session, where there is no face to draw.
+            if (destination == TopLevelDestination.PROFILE && account != null) {
+                UserAvatar(
+                    url = account.avatarUrl,
+                    name = account.name,
+                    size = NavigationIconSize,
+                )
+            } else {
+                Icon(
+                    imageVector = if (selected) destination.selectedIcon else destination.icon,
+                    // The item above carries the name; describing the glyph again says it twice.
+                    contentDescription = null,
+                    tint =
+                    if (selected) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(NavigationIconSize),
+                )
+            }
         }
         if (destination == TopLevelDestination.NOTIFICATIONS && unreadCount > 0) {
             Badge(

@@ -75,6 +75,7 @@ import io.github.nodyssey.ui.login.WebViewGoal
 import io.github.nodyssey.ui.navigation.NodysseyBottomBar
 import io.github.nodyssey.ui.navigation.TopLevelDestination
 import io.github.nodyssey.ui.notifications.NotificationsViewModel
+import io.github.nodyssey.ui.postlist.HomeAccount
 import io.github.nodyssey.ui.postlist.HomeFeedStates
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.about_privacy
@@ -93,12 +94,17 @@ import io.github.nodyssey.ui.sticker.StickerNavigation
 import io.github.nodyssey.ui.sticker.StickerNotices
 import io.github.plaza.core.runCatchingExceptCancellation
 import io.github.plaza.designsys.theme.LocalEinkMode
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun MainNavigation(
     container: AppContainer,
@@ -112,6 +118,27 @@ fun MainNavigation(
         initialValue = UserSettings(),
     )
     val historySession by container.sessionRepository.state.collectAsStateWithLifecycle()
+    /*
+     * The face 我的 draws, which is the account's own picture rather than a person outline.
+     *
+     * The same repository and the same session-generation guard the home bar used before it gave the
+     * avatar up: the profile is keyed by the session, so signing out and back in as somebody else
+     * cannot leave the previous face on the bar. Null while signed out, which is when there is no
+     * face to draw.
+     */
+    val selfAccount by remember(container) {
+        container.sessionRepository.state
+            .distinctUntilChangedBy { it.generation }
+            .flatMapLatest { session ->
+                if (session.isSignedIn) {
+                    container.profileRepository
+                        .observeProfile(session.fingerprint)
+                        .map { profile -> profile?.let { HomeAccount(it.name, it.avatarUrl) } }
+                } else {
+                    flowOf(null)
+                }
+            }
+    }.collectAsStateWithLifecycle(initialValue = null)
     LaunchedEffect(historySession.isSignedIn, historySession.fingerprint) {
         container.postRepository.reconcileSession(historySession.isSignedIn, historySession.fingerprint)
         if (historySession.isSignedIn) {
@@ -644,6 +671,7 @@ fun MainNavigation(
                 current = currentTab,
                 onSelect = selectTab,
                 unreadCount = notificationsState.counts.all,
+                account = selfAccount,
             )
         }
     }

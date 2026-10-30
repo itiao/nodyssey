@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import io.github.nodyssey.ui.navigation.NodysseyBottomBar
 import io.github.nodyssey.ui.navigation.TopLevelDestination
+import io.github.nodyssey.ui.postlist.HomeAccount
 import io.github.plaza.designsys.theme.PlazaTheme
 import org.junit.Before
 import org.junit.Rule
@@ -34,13 +35,19 @@ class NavigationBarRenderTest {
     fun onlyWhenRendering() = assumeRendering()
 
     @Composable
-    private fun Screen(darkTheme: Boolean, current: TopLevelDestination, unreadCount: Int = 0) {
+    private fun Screen(
+        darkTheme: Boolean,
+        current: TopLevelDestination,
+        unreadCount: Int = 0,
+        account: HomeAccount? = null,
+    ) {
         PlazaTheme(darkTheme = darkTheme) {
             Box(Modifier.fillMaxSize()) {
                 NodysseyBottomBar(
                     current = current,
                     onSelect = {},
                     unreadCount = unreadCount,
+                    account = account,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -69,5 +76,20 @@ class NavigationBarRenderTest {
         }
 
         composeRule.onRoot().captureRender("navigation-bar-badge-dark")
+    }
+
+    /** 我的 while signed in: the account's own face in place of the person outline. */
+    @Test
+    fun `the bar with a signed-in account in dark`() {
+        composeRule.setContent {
+            Screen(
+                darkTheme = true,
+                current = TopLevelDestination.PROFILE,
+                // A null URL takes the monogram the app falls back to, which is what the JVM can draw.
+                account = HomeAccount(name = "tiao", avatarUrl = null),
+            )
+        }
+
+        composeRule.onRoot().captureRender("navigation-bar-account-dark")
     }
 }
