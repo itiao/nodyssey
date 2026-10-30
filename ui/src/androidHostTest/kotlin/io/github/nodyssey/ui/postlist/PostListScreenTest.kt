@@ -420,8 +420,8 @@ class PostListScreenTest {
 
         composeRule.onNodeWithContentDescription("排序方式").assertIsNotDisplayed()
         composeRule.onNodeWithContentDescription("搜索").assertIsNotDisplayed()
-        composeRule.onNodeWithText("综合").assertIsDisplayed()
-        composeRule.onNodeWithText("技术").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("综合").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("技术").assertIsDisplayed()
         // The header folding is not the feed scrolling. With a collapse limit that never got
         // published, the header folded exactly like this and then swallowed the rest of the drag.
         composeRule.runOnIdle {
@@ -485,7 +485,7 @@ class PostListScreenTest {
 
         composeRule.onNodeWithContentDescription("排序方式").assertIsNotDisplayed()
         // The strip never folds, so the way back to another board is still on screen.
-        composeRule.onNodeWithText("综合").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("综合").assertIsDisplayed()
     }
 
     /**

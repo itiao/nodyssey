@@ -69,12 +69,12 @@ class BoardDragEinkTest {
         composeRule.waitForIdle()
 
         // A long press anywhere on the strip is what opens 编辑板块.
-        composeRule.onNodeWithText("日常").performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription("日常").performTouchInput { longClick() }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("拖动排序，点 × 移出首页").assertIsDisplayed()
 
-        val from = composeRule.onNodeWithText("日常").fetchSemanticsNode().boundsInRoot.center
-        val onto = composeRule.onNodeWithText("技术").fetchSemanticsNode().boundsInRoot.center
+        val from = composeRule.onNodeWithContentDescription("日常").fetchSemanticsNode().boundsInRoot.center
+        val onto = composeRule.onNodeWithContentDescription("技术").fetchSemanticsNode().boundsInRoot.center
 
         // Driven on the root in root coordinates, and in steps: `detectDragGestures` only starts
         // once touch slop is crossed, and a single jump from down to up gives it one event to

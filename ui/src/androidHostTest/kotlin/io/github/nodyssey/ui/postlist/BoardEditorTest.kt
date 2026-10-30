@@ -37,7 +37,7 @@ class BoardEditorTest {
     private var lastParked: Set<String>? = null
 
     private fun longPress(title: String) {
-        composeRule.onNodeWithText(title).performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription(title).performTouchInput { longClick() }
         composeRule.waitForIdle()
     }
 
@@ -66,7 +66,7 @@ class BoardEditorTest {
     fun `a tap in the editor takes a board off the strip and does not open it`() {
         openEditor()
 
-        composeRule.onNodeWithText("技术").performClick()
+        composeRule.onNodeWithContentDescription("技术").performClick()
         composeRule.waitForIdle()
 
         assertEquals(setOf("tech"), lastParked)
@@ -102,11 +102,11 @@ class BoardEditorTest {
     @Test
     fun `a drag after parking keeps the parked board parked`() {
         openEditor()
-        composeRule.onNodeWithText("技术").performClick()
+        composeRule.onNodeWithContentDescription("技术").performClick()
         composeRule.waitForIdle()
 
-        val from = composeRule.onNodeWithText("日常").fetchSemanticsNode().boundsInRoot.center
-        val onto = composeRule.onNodeWithText("交易").fetchSemanticsNode().boundsInRoot.center
+        val from = composeRule.onNodeWithContentDescription("日常").fetchSemanticsNode().boundsInRoot.center
+        val onto = composeRule.onNodeWithContentDescription("交易").fetchSemanticsNode().boundsInRoot.center
         lastParked = null
         composeRule.onRoot().performTouchInput {
             down(from)
