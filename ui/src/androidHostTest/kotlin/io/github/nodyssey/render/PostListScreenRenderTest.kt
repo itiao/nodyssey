@@ -1,8 +1,12 @@
 package io.github.nodyssey.render
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
@@ -16,6 +20,8 @@ import com.github.takahirom.roborazzi.captureScreenRoboImage
 import io.github.nodyssey.data.Board
 import io.github.nodyssey.data.FeedPost
 import io.github.nodyssey.model.PostSummary
+import io.github.nodyssey.ui.navigation.NodysseyBottomBar
+import io.github.nodyssey.ui.navigation.TopLevelDestination
 import io.github.nodyssey.ui.postlist.HomeFeedStates
 import io.github.nodyssey.ui.postlist.PostListScreen
 import io.github.nodyssey.ui.postlist.PostListUiState
@@ -47,32 +53,54 @@ class PostListScreenRenderTest {
     fun onlyWhenRendering() = assumeRendering()
 
     @Composable
-    private fun Screen(darkTheme: Boolean, pureWhite: Boolean = false) {
-        PlazaTheme(darkTheme = darkTheme, pureWhite = pureWhite) {
-            val feed =
-                remember {
-                    flowOf(
-                        PagingData.from(
-                            data = FEED,
-                            sourceLoadStates =
-                            LoadStates(
-                                refresh = LoadState.NotLoading(false),
-                                prepend = LoadState.NotLoading(true),
-                                append = LoadState.NotLoading(true),
-                            ),
+    private fun Feed() {
+        val feed =
+            remember {
+                flowOf(
+                    PagingData.from(
+                        data = FEED,
+                        sourceLoadStates =
+                        LoadStates(
+                            refresh = LoadState.NotLoading(false),
+                            prepend = LoadState.NotLoading(true),
+                            append = LoadState.NotLoading(true),
                         ),
-                    )
+                    ),
+                )
+            }
+        PostListScreen(
+            state = PostListUiState(boards = BOARDS),
+            postsFor = { feed.collectAsLazyPagingItems() },
+            feedStates = rememberSaveable(saver = HomeFeedStates.Saver) { HomeFeedStates() },
+            onPostClick = {},
+            onBoardClick = {},
+            onSortChange = {},
+            onSignInClick = {},
+            onRecoverInBrowser = {},
+        )
+    }
+
+    /**
+     * [withBar] puts the app's bottom bar under the screen.
+     *
+     * The bar is not part of 首页 — it belongs to the suite one level up — so a picture of the screen
+     * alone is a picture with its foot cut off. Every shot here that is about the feed keeps the bar
+     * off (the screen is the subject); the one shot that is about the app's chrome as a whole turns
+     * it on.
+     */
+    @Composable
+    private fun Screen(darkTheme: Boolean, pureWhite: Boolean = false, withBar: Boolean = false) {
+        PlazaTheme(darkTheme = darkTheme, pureWhite = pureWhite) {
+            if (withBar) {
+                // The app's own arrangement for a compact window: the screen above the bar, which
+                // keeps its height instead of the screen running under it.
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f)) { Feed() }
+                    NodysseyBottomBar(current = TopLevelDestination.HOME, onSelect = {})
                 }
-            PostListScreen(
-                state = PostListUiState(boards = BOARDS),
-                postsFor = { feed.collectAsLazyPagingItems() },
-                feedStates = rememberSaveable(saver = HomeFeedStates.Saver) { HomeFeedStates() },
-                onPostClick = {},
-                onBoardClick = {},
-                onSortChange = {},
-                onSignInClick = {},
-                onRecoverInBrowser = {},
-            )
+            } else {
+                Feed()
+            }
         }
     }
 
@@ -88,6 +116,14 @@ class PostListScreenRenderTest {
         composeRule.setContent { Screen(darkTheme = true) }
 
         composeRule.onRoot().captureRender("post-list-dark")
+    }
+
+    /** 首页 as the app draws it: header, feed and the bottom bar in one frame. */
+    @Test
+    fun `the feed with the bottom bar in dark`() {
+        composeRule.setContent { Screen(darkTheme = true, withBar = true) }
+
+        composeRule.onRoot().captureRender("post-list-with-bar-dark")
     }
 
     @Test

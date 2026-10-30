@@ -1,8 +1,6 @@
 package io.github.nodyssey.ui.postlist
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Edit
@@ -63,13 +60,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -123,10 +119,10 @@ import io.github.nodyssey.ui.common.withoutBottom
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.action_create_post
 import io.github.nodyssey.ui.resources.action_scroll_to_top
+import io.github.nodyssey.ui.resources.action_search
 import io.github.nodyssey.ui.resources.action_sort
 import io.github.nodyssey.ui.resources.action_switch_site
 import io.github.nodyssey.ui.resources.feed_page_size_note
-import io.github.nodyssey.ui.resources.home_search_hint
 import io.github.nodyssey.ui.resources.page_jump_newest
 import io.github.nodyssey.ui.resources.post_badge_pinned
 import io.github.nodyssey.ui.resources.post_last_reply_by
@@ -134,7 +130,6 @@ import io.github.nodyssey.ui.resources.post_view_count
 import io.github.nodyssey.ui.resources.site_switch_next_launch
 import io.github.nodyssey.ui.resources.site_switch_separate_sessions
 import io.github.nodyssey.ui.resources.site_switch_signed_in_as
-import io.github.nodyssey.ui.resources.tab_profile
 import io.github.nodyssey.ui.settings.rememberSiteSwitch
 import io.github.nodyssey.ui.settings.siteSwitchRestartsApp
 import io.github.plaza.core.TimeFormat
@@ -144,18 +139,14 @@ import io.github.plaza.designsys.component.LayerCard
 import io.github.plaza.designsys.component.LayerCardGap
 import io.github.plaza.designsys.component.LayerPageGutter
 import io.github.plaza.designsys.component.MetaStat
-import io.github.plaza.designsys.component.PlazaExtendedFab
-import io.github.plaza.designsys.component.PlazaFabHeight
 import io.github.plaza.designsys.component.PlazaIcons
 import io.github.plaza.designsys.component.PrefetchAvatars
 import io.github.plaza.designsys.component.SkeletonBar
 import io.github.plaza.designsys.component.UserAvatar
 import io.github.plaza.designsys.theme.LocalPlazaLayers
 import io.github.plaza.designsys.theme.PlazaTheme
-import io.github.plaza.designsys.theme.Sizes
 import io.github.plaza.designsys.theme.Spacing
 import io.github.plaza.designsys.theme.cardBorder
-import io.github.plaza.designsys.theme.cardBorderStroke
 import io.github.plaza.designsys.theme.cardShadow
 import io.github.plaza.designsys.theme.readableWidth
 import kotlinx.coroutines.flow.Flow
@@ -180,7 +171,6 @@ fun PostListRoute(
     onSignIn: () -> Unit,
     onVerify: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onAccountClick: () -> Unit = {},
     onNavigationBarHiddenChanged: (Boolean) -> Unit = {},
     reselectRequests: Int = 0,
 ) {
@@ -193,7 +183,6 @@ fun PostListRoute(
         onPostClick = onPostClick,
         onCreatePost = onCreatePost,
         onSearch = onSearch,
-        onAccountClick = onAccountClick,
         onBoardClick = viewModel::selectCategory,
         onArrangementChange = viewModel::saveBoardArrangement,
         onSortChange = viewModel::selectSort,
@@ -253,8 +242,6 @@ fun PostListScreen(
     onCreatePost: () -> Unit = {},
     /** Opens 搜索 on top of this list, from the app bar's own action. */
     onSearch: () -> Unit = {},
-    /** The account avatar at the end of the bar: 我的. */
-    onAccountClick: () -> Unit = {},
     /** Keeps the host navigation bar hidden until the user deliberately scrolls toward the list start. */
     onNavigationBarHiddenChanged: (Boolean) -> Unit = {},
     /**
@@ -569,8 +556,8 @@ fun PostListScreen(
                     sort = state.sort,
                     onSortChange = onSortChange,
                     onSearch = onSearch,
+                    onCreatePost = onCreatePost,
                     account = state.account,
-                    onAccountClick = onAccountClick,
                     scrollBehavior = topBarScrollBehavior,
                 )
                 BoardStrip(
@@ -591,22 +578,6 @@ fun PostListScreen(
                     },
                     onBoardClick = onBoardClick,
                     onArrangementChange = onArrangementChange,
-                )
-            }
-        },
-        floatingActionButton = {
-            // With 翻页栏 on, 发帖 moves *into* the toolbar's own FAB slot rather than standing beside
-            // it — two floating things in the same corner is what Material's slot exists to prevent,
-            // and it is the arrangement the thread already ships with its 回复 button.
-            if (!showPageBar) {
-                // Follow the same sticky direction state as the navigation bar. Stopping cannot
-                // briefly flip this value, so the built-in extended-FAB animation gets one stable
-                // target.
-                PlazaExtendedFab(
-                    text = stringResource(Res.string.action_create_post),
-                    icon = Icons.Default.Edit,
-                    onClick = onCreatePost,
-                    expanded = !navigationBarHidden,
                 )
             }
         },
@@ -646,10 +617,10 @@ fun PostListScreen(
 
             if (showPageBar) {
                 FeedPageBar(
-                    // The same sticky direction state the FAB follows, rather than a second nested
-                    // scroll connection of the toolbar's own: two of them reading the same gesture
-                    // would disagree at the threshold and the bar would collapse out of step with
-                    // the navigation bar it sits above.
+                    // The same sticky direction state the navigation bar follows, rather than a
+                    // second nested scroll connection of the toolbar's own: two of them reading the
+                    // same gesture would disagree at the threshold and the bar would collapse out of
+                    // step with the navigation bar it sits above.
                     expanded = !navigationBarHidden || showPageSheet,
                     page = visiblePage,
                     totalPages = state.totalPages,
@@ -663,7 +634,6 @@ fun PostListScreen(
                     },
                     onNext = { goToPage((visiblePage + 1).coerceAtMost(state.totalPages)) },
                     onPageClick = { showPageSheet = true },
-                    onCreatePost = onCreatePost,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(bottom = bottomInset),
@@ -832,13 +802,12 @@ private fun BoardFeed(
 }
 
 /**
- * 首页翻页栏: the page keys stacked over 发帖, in the corner the thumb is already in.
+ * 首页翻页栏: the page keys in the corner the thumb is already in.
  *
  * The rail itself is [PageJumpRail], shared with the comment thread and 管理记录 so the wording and
- * the shortcuts cannot drift between the three screens that have it. 发帖 leaves the `Scaffold`'s
- * FAB slot while this is on and joins the stack instead — two floating things side by side in one
- * corner is what that slot exists to prevent, and the thread has shipped the stacked pair for as
- * long as it has had a rail.
+ * the shortcuts cannot drift between the three screens that have it. 发帖 used to ride on top of it;
+ * it lives in the header now, so the rail stands alone and nothing floats in this corner but the
+ * pages themselves.
  */
 @Composable
 private fun FeedPageBar(
@@ -849,7 +818,6 @@ private fun FeedPageBar(
     onScrollToTop: () -> Unit,
     onNext: () -> Unit,
     onPageClick: () -> Unit,
-    onCreatePost: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -870,17 +838,17 @@ private fun FeedPageBar(
             previousLabel = Res.string.action_scroll_to_top,
             previousIcon = PlazaIcons.VerticalAlignTop,
         )
-        PlazaExtendedFab(
-            text = stringResource(Res.string.action_create_post),
-            icon = Icons.Default.Edit,
-            onClick = onCreatePost,
-            expanded = expanded,
-        )
     }
 }
 
-/** Clears the FAB and its 16dp margin, with a little of the page showing under it. */
-private val FeedBottomClearance = PlazaFabHeight + Spacing.lg + Spacing.md
+/**
+ * What the last row keeps clear of the foot of the list.
+ *
+ * It used to be the FAB's height and margin; 发帖 is in the header now, so all that is left to clear
+ * is the 翻页栏 when 设置 turns it on — a column of keys down the right edge, and a row that ran
+ * under them would end in a button rather than in its own last line.
+ */
+private val FeedBottomClearance = Spacing.lg
 
 /** How much of the feed a "back to the top" actually animates past; anything beyond it is a jump. */
 private const val SCROLL_TO_TOP_ANIMATED_ITEMS = 12
@@ -899,21 +867,27 @@ private const val FIRST_PAGE = 1
 private const val APPEND_WAIT_MILLIS = 15_000L
 
 /**
- * The home header: 站点 and the account on the first line, 搜索 and 排序 on the second.
+ * The home header: one line — 站点 on the left, then 搜索, 排序 and 发帖 on the right.
  *
- * Both lines fold away together as the feed advances and come back on any scroll toward the top —
- * `enterAlways`, the same as the navigation bar — while the board strip under them stays pinned,
- * since it is navigation and the one thing a reader reaches for mid-feed.
+ * It folds away as the feed advances and comes back on any scroll toward the top — `enterAlways`,
+ * the same as the navigation bar — while the board strip under it stays pinned, since it is
+ * navigation and the one thing a reader reaches for mid-feed.
  *
- * A [CollapsingHeader] rather than a `TopAppBar`: Material's bars take one title and a row of icon
- * actions, and the second line here is a search field, which no bar slot holds. The scroll behaviour
- * is still Material's, and [CollapsingHeader] keeps the half of the contract `TopAppBar` would have
- * kept — publishing the collapse limit from its measure pass. Publishing it from anywhere the header
- * does not recompose leaves the limit at `-Float.MAX_VALUE`, and `enterAlways` then swallows every
- * vertical drag before the feed sees it.
+ * A [CollapsingHeader] rather than a `TopAppBar`: the bar is still a wordmark button and a run of
+ * icon actions, which a `TopAppBar` could hold, but its scroll contract is the half that matters and
+ * [CollapsingHeader] is what keeps it — publishing the collapse limit from its measure pass.
+ * Publishing it from anywhere the header does not recompose leaves the limit at `-Float.MAX_VALUE`,
+ * and `enterAlways` then swallows every vertical drag before the feed sees it.
  *
- * 搜索 is a field-shaped button rather than a field: tapping it opens the search screen, where the
- * real `SearchBar` lives with its tabs and history. Typing here would have to duplicate all of that.
+ * 搜索 is an icon rather than a field: tapping it opens the search screen, where the real `SearchBar`
+ * lives with its tabs and history. Typing here would have to duplicate all of that. 发帖 is an icon
+ * for the same reason it used to be a floating button — it is the one action on this screen that
+ * starts something rather than goes somewhere — and it sits in this row now instead of floating over
+ * the corner of the feed, where it covered the last row and had to be kept clear of by padding.
+ *
+ * The account's face is not up here any more. It opened 我的, and the bottom bar already has that tab
+ * one thumb away; a second door to the same screen at the top of the feed only ever cost the row the
+ * width the three actions needed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -921,8 +895,8 @@ private fun HomeHeader(
     sort: FeedSort,
     onSortChange: (FeedSort) -> Unit,
     onSearch: () -> Unit,
+    onCreatePost: () -> Unit,
     account: HomeAccount?,
-    onAccountClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     CollapsingHeader(
@@ -932,148 +906,116 @@ private fun HomeHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // The site button's own 8dp inset puts the wordmark on the 16dp margin; the account's
-                // 48dp target is drawn 6dp off the edge, which lands its 28dp face on the same 16dp.
-                .padding(start = Spacing.sm, end = AccountEndInset),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SiteSwitcher(account = account, modifier = Modifier.weight(1f))
-            AccountButton(account = account, onClick = onAccountClick)
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.md),
+                // The site button's own 8dp inset puts the wordmark on the 16dp margin, and the
+                // last tile stops on the same one.
+                .padding(horizontal = Spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(HeaderControlGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SearchPill(onClick = onSearch, modifier = Modifier.weight(1f))
+            // The wordmark takes what the actions leave, and truncates rather than pushing them off.
+            SiteSwitcher(account = account, modifier = Modifier.weight(1f))
+            HeaderIconButton(
+                icon = Icons.Default.Search,
+                contentDescription = stringResource(Res.string.action_search),
+                onClick = onSearch,
+            )
             SortButton(sort = sort, onSortChange = onSortChange)
+            HeaderIconButton(
+                icon = Icons.Default.Edit,
+                contentDescription = stringResource(Res.string.action_create_post),
+                onClick = onCreatePost,
+                prominent = true,
+            )
         }
     }
 }
 
-/** The signed-in face, or an outlined person when there is none to show; either way the way into 我的. */
-@Composable
-private fun AccountButton(
-    account: HomeAccount?,
-    onClick: () -> Unit,
-) {
-    val label = stringResource(Res.string.tab_profile)
-    Box(
-        modifier = Modifier
-            .size(Sizes.minTouchTarget)
-            .clip(AccountAvatarShape)
-            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (account != null) {
-            UserAvatar(url = account.avatarUrl, name = account.name, size = AccountAvatarSize, shape = AccountAvatarShape)
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(AccountAvatarSize)
-                    .cardShadow(AccountAvatarShape, LocalPlazaLayers.current.shadows)
-                    .clip(AccountAvatarShape)
-                    .background(LocalPlazaLayers.current.raised)
-                    // The search pill's outline, for the same reason: on 墨水屏 it is the only edge.
-                    .cardBorder(LocalPlazaLayers.current, AccountAvatarShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(HeaderIconSize))
-            }
-        }
-    }
-}
+/**
+ * 28dp: the size of every control in the header.
+ *
+ * It was the account's face, which sat at the end of this row until 我的 took over the job — the
+ * bottom bar has the tab, so a face up here was a second way into the same screen. The three actions
+ * took its size when it left, which is what keeps the row reading as one set of controls rather than
+ * one big one and three small ones. Compose still hit-tests them at 48.
+ */
+private val HeaderControlSize = 28.dp
 
-/** 28dp: the account's face at the end of the bar, drawn inside its 48dp target. */
-private val AccountAvatarSize = 28.dp
-
-private val AccountAvatarShape = RoundedCornerShape(8.dp)
-
-/** Where the account's 48dp target stops short of the edge — see the header row that uses it. */
-private val AccountEndInset = 6.dp
-
-/** Between the search pill and 排序. */
-private val HeaderControlGap = 6.dp
-
-/** The search pill and 排序 beside it, a step under a 48dp control; Compose still hit-tests them at 48. */
-private val HeaderControlHeight = 40.dp
+/**
+ * Between the header's controls.
+ *
+ * Wide enough that the three tiles read as three things rather than one segmented control: at 28dp
+ * a 6dp gap is a fifth of a tile, which at this size is a seam, not a space.
+ */
+private val HeaderControlGap = 12.dp
 
 /** The glyphs in the header's controls, a step under Material's 24dp. */
 private val HeaderIconSize = 18.dp
 
-/** The search field's shape, as a button into the search screen. */
+/**
+ * The glyph inside one of the header's action tiles.
+ *
+ * The tile is [HeaderControlSize] and the glyph keeps the ratio Material gives a 24dp glyph in a
+ * 40dp button, so the row reads as three controls of one weight rather than three glyphs fighting
+ * their frames.
+ */
+private val HeaderActionIconSize = HeaderIconSize
+
+/**
+ * One of the header's icon actions: 搜索, 排序, 发帖.
+ *
+ * [prominent] is 发帖's: the only action up here that starts something rather than going somewhere,
+ * and the tone the floating button it replaced was drawn in, so the reader's eye still lands on it
+ * first. Everything else takes the raised tone, which on 墨水屏 is the page's paper — that, plus the
+ * border, is the only edge these tiles have there.
+ */
 @Composable
-private fun SearchPill(
+private fun HeaderIconButton(
+    icon: ImageVector,
+    contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    prominent: Boolean = false,
 ) {
     val layers = LocalPlazaLayers.current
     val shape = MaterialTheme.shapes.medium
-    Surface(
+    FilledIconButton(
         onClick = onClick,
         shape = shape,
-        color = layers.raised,
-        border = layers.cardBorderStroke,
-        modifier = modifier
-            .height(HeaderControlHeight)
-            .cardShadow(shape, layers.shadows),
+        modifier = Modifier
+            .size(HeaderControlSize)
+            .cardShadow(shape, layers.shadows)
+            .cardBorder(layers, shape),
+        colors =
+        IconButtonDefaults.filledIconButtonColors(
+            containerColor = if (prominent) MaterialTheme.colorScheme.primaryContainer else layers.raised,
+            contentColor =
+            if (prominent) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        ),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(HeaderIconSize),
-            )
-            Text(
-                text = stringResource(Res.string.home_search_hint),
-                // The hint is chrome, sized with the pill rather than with the reading size.
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(HeaderActionIconSize),
+        )
     }
 }
 
-/** 排序, as a square-cornered button beside the search pill with its menu anchored under it. */
+/** 排序, as a tile beside 搜索 with its menu anchored under it. */
 @Composable
 private fun SortButton(
     sort: FeedSort,
     onSortChange: (FeedSort) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    val layers = LocalPlazaLayers.current
-    val shape = MaterialTheme.shapes.medium
     Box {
-        FilledIconButton(
+        HeaderIconButton(
+            icon = PlazaIcons.SwapVert,
+            contentDescription = stringResource(Res.string.action_sort),
             onClick = { menuOpen = true },
-            shape = shape,
-            modifier = Modifier
-                .size(HeaderControlHeight)
-                .cardShadow(shape, layers.shadows)
-                // As the search pill beside it: on 墨水屏 the raised tone is the page's paper.
-                .cardBorder(layers, shape),
-            colors =
-            IconButtonDefaults.filledIconButtonColors(
-                containerColor = layers.raised,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        ) {
-            Icon(
-                imageVector = PlazaIcons.SwapVert,
-                contentDescription = stringResource(Res.string.action_sort),
-                modifier = Modifier.size(HeaderIconSize),
-            )
-        }
+        )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             FeedSortOrder.forEach { order ->
                 SortMenuItem(order, sort) {
@@ -1118,6 +1060,9 @@ private fun SiteSwitcher(
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
+                // The wordmark shares the row with four controls now; on a narrow window it gives
+                // way rather than pushing 发帖 off the edge.
+                overflow = TextOverflow.Ellipsis,
             )
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,

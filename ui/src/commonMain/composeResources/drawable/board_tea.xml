@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from IconPark's tea (Apache-2.0, bytedance/iconpark); the icon the site draws for this board. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+        <path
+            android:pathData="M11 18.1672C11 18.0749 11.0749 18 11.1672 18H34.8328C34.9251 18 35 18.0749 35 18.1672V30C35 36.6274 29.6274 42 23 42C16.3726 42 11 36.6274 11 30V18.1672Z"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M35 30C38.3137 30 41 27.3137 41 24C41 20.6863 38.3137 18 35 18"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M11,8 L11,11"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M35,8 L35,11"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M23,5 L23,11"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+</vector>

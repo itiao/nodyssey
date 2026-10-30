@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from IconPark's terminal (Apache-2.0, bytedance/iconpark); the icon the site draws for this board. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+        <path
+            android:pathData="M6.0,8.0 H42.0 A2.0,2.0 0 0 1 44.0,10.0 V38.0 A2.0,2.0 0 0 1 42.0,40.0 H6.0 A2.0,2.0 0 0 1 4.0,38.0 V10.0 A2.0,2.0 0 0 1 6.0,8.0 Z"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M12 18L19 24L12 30"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+        <path
+            android:pathData="M23 32H36"
+            android:fillColor="#00000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            />
+</vector>

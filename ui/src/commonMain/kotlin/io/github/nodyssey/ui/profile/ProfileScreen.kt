@@ -487,11 +487,15 @@ private fun IdentityRow(
     onOpenSpace: () -> Unit,
 ) {
     // 头像和 ID 本身就是进空间的入口，右边再挂一个编辑按钮只是重复，去掉。
+    //
+    // No `clip` on the row, though it is the whole row that is clickable: the clip is drawn over the
+    // children, and the avatar sits flush against the row's left edge — a 20dp row corner cut the
+    // avatar's own 13.6dp one on its left side only, so the picture was rounder on the left than on
+    // the right. The ripple loses its rounded corners with it, which is the cheaper of the two.
     Row(
         modifier =
         Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.largeIncreased)
             .clickable(onClickLabel = stringResource(Res.string.profile_space), onClick = onOpenSpace),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

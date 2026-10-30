@@ -91,13 +91,27 @@ import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.action_hide_all_boards
 import io.github.nodyssey.ui.resources.action_show_all_boards
 import io.github.nodyssey.ui.resources.board_admin_only
+import io.github.nodyssey.ui.resources.board_all_application
+import io.github.nodyssey.ui.resources.board_car
+import io.github.nodyssey.ui.resources.board_dashboard_one
+import io.github.nodyssey.ui.resources.board_dollar
 import io.github.nodyssey.ui.resources.board_edit_done
 import io.github.nodyssey.ui.resources.board_edit_hint
 import io.github.nodyssey.ui.resources.board_edit_title
+import io.github.nodyssey.ui.resources.board_experiment
+import io.github.nodyssey.ui.resources.board_face_recognition
+import io.github.nodyssey.ui.resources.board_formula
+import io.github.nodyssey.ui.resources.board_hold_interface
+import io.github.nodyssey.ui.resources.board_inbox_in
+import io.github.nodyssey.ui.resources.board_oval_love_two
 import io.github.nodyssey.ui.resources.board_park
 import io.github.nodyssey.ui.resources.board_parked
 import io.github.nodyssey.ui.resources.board_parked_title
+import io.github.nodyssey.ui.resources.board_pic_one
+import io.github.nodyssey.ui.resources.board_receiver
 import io.github.nodyssey.ui.resources.board_restore
+import io.github.nodyssey.ui.resources.board_tea
+import io.github.nodyssey.ui.resources.board_terminal
 import io.github.plaza.designsys.component.PlazaBackHandler
 import io.github.plaza.designsys.component.PlazaChipDefaults
 import io.github.plaza.designsys.theme.LocalEinkMode
@@ -105,6 +119,8 @@ import io.github.plaza.designsys.theme.LocalPlazaLayers
 import io.github.plaza.designsys.theme.Spacing
 import io.github.plaza.designsys.theme.cardBorder
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -724,7 +740,16 @@ private fun BoardPill(
     FilterChip(
         selected = selected,
         onClick = onClick,
-        label = { Text(text = board.title, style = pillLabelStyle(selected), maxLines = 1) },
+        label = {
+            // The board's own glyph instead of its name: the strip is a row of five to ten boards
+            // and the words were wider than the icons are apart. The name is still what TalkBack
+            // reads, so nothing is lost to a reader who cannot see which glyph is which.
+            Icon(
+                painter = painterResource(boardGlyph(board.slug)),
+                contentDescription = board.title,
+                modifier = Modifier.size(PILL_ICON_SIZE),
+            )
+        },
         // A chip reads as "select this"; while editing its tap does something else, and TalkBack says
         // what. A null action keeps the chip's own, and only names it.
         modifier =
@@ -910,6 +935,37 @@ private val PILL_LABEL_LINE_HEIGHT = 18.sp
 private val ToggleSlotWidth = ToggleWidth + ToggleEndInset
 
 private val PILL_ICON_SIZE = 16.dp
+
+/**
+ * The glyph a board carries on the strip.
+ *
+ * The site draws one icon per board down the left of its own feed — a cup for 日常, a sigma for 技术,
+ * a tray for 情报 — and these are those icons, taken from IconPark (Apache-2.0), which is what the
+ * site's markup uses. Slug rather than title: the site renames boards more often than it renumbers
+ * them, and the slug is the half that stays put.
+ *
+ * 综合 is the front page rather than a board and takes the grid, which is the site's own 所有版块
+ * glyph. So does anything the site adds that this table has not heard of yet: an unknown board is a
+ * board with more in it than one icon can say, and a wrong glyph would be worse than a generic one.
+ */
+private fun boardGlyph(slug: String?): DrawableResource =
+    when (slug) {
+        null -> Res.drawable.board_all_application
+        "daily" -> Res.drawable.board_tea
+        "tech" -> Res.drawable.board_formula
+        "info" -> Res.drawable.board_receiver
+        "review" -> Res.drawable.board_dashboard_one
+        "trade" -> Res.drawable.board_dollar
+        "carpool" -> Res.drawable.board_car
+        "promotion" -> Res.drawable.board_hold_interface
+        "life" -> Res.drawable.board_oval_love_two
+        "dev" -> Res.drawable.board_terminal
+        "photo-share" -> Res.drawable.board_pic_one
+        "expose" -> Res.drawable.board_face_recognition
+        "inside" -> Res.drawable.board_inbox_in
+        "sandbox" -> Res.drawable.board_experiment
+        else -> Res.drawable.board_all_application
+    }
 
 private const val DRAG_SCALE = 1.06f
 private const val DRAG_TILT_DEGREES = -3f

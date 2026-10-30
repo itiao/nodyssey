@@ -1,8 +1,10 @@
 package io.github.nodyssey
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,10 +22,6 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
-import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +72,7 @@ import io.github.nodyssey.ui.compare.LocalOpenReportCompare
 import io.github.nodyssey.ui.composer.ComposerShare
 import io.github.nodyssey.ui.composer.PendingComposerShare
 import io.github.nodyssey.ui.login.WebViewGoal
-import io.github.nodyssey.ui.navigation.NodysseyNavigationItems
+import io.github.nodyssey.ui.navigation.NodysseyBottomBar
 import io.github.nodyssey.ui.navigation.TopLevelDestination
 import io.github.nodyssey.ui.notifications.NotificationsViewModel
 import io.github.nodyssey.ui.postlist.HomeFeedStates
@@ -95,7 +93,6 @@ import io.github.nodyssey.ui.sticker.StickerNavigation
 import io.github.nodyssey.ui.sticker.StickerNotices
 import io.github.plaza.core.runCatchingExceptCancellation
 import io.github.plaza.designsys.theme.LocalEinkMode
-import io.github.plaza.designsys.theme.LocalPlazaLayers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
@@ -249,13 +246,9 @@ fun MainNavigation(
     // touch: a screen reader's swipes move accessibility focus, so for TalkBack/VoiceOver a hidden
     // bar is not tucked away, it is gone. Under touch exploration the bar stays put.
     val touchExploration = rememberTouchExplorationEnabled()
-    val showNavigationSuite =
+    val showBottomBar =
         (atTabRoot && (!tabBarHiddenByScroll || isListDetailExpanded || touchExploration)) ||
             (isListDetailExpanded && paneRoleOf(backStack.lastOrNull()) != null)
-    val navigationSuiteState = rememberNavigationSuiteScaffoldState()
-    LaunchedEffect(showNavigationSuite) {
-        if (showNavigationSuite) navigationSuiteState.show() else navigationSuiteState.hide()
-    }
 
     val scope = rememberCoroutineScope()
 
@@ -539,41 +532,25 @@ fun MainNavigation(
         )
     }
 
-    NavigationSuiteScaffold(
-        navigationItems = {
-            NodysseyNavigationItems(
-                current = currentTab,
-                onSelect = { destination ->
-                    // Re-selecting a tab takes its list back to the start — 首页 reloads on the way,
-                    // since the one thing a reader taps 首页 for while already on 首页 is 新帖. Only
-                    // the two tabs that *are* a list long enough to get lost in answer at all; 我的
-                    // stays inert, because a tab that silently jumps somewhere is worse than one
-                    // that does nothing.
-                    if (destination == currentTab) {
-                        when (destination) {
-                            TopLevelDestination.HOME -> homeReselectRequests++
-                            TopLevelDestination.NOTIFICATIONS -> notificationsScrollToTopRequests++
-                            else -> Unit
-                        }
-                    }
-                    currentTab = destination
-                },
-                unreadCount = notificationsState.counts.all,
-            )
-        },
-        modifier = modifier,
-        navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.navigationSuiteType(windowAdaptiveInfo),
-        // The bar is a card like any other — white on the grey page — and the rail beside a wide
-        // layout sits flush with the page, since it has no content under it to lift off.
-        navigationSuiteColors =
-        NavigationSuiteDefaults.colors(
-            shortNavigationBarContainerColor = LocalPlazaLayers.current.card,
-            navigationBarContainerColor = LocalPlazaLayers.current.card,
-            navigationRailContainerColor = LocalPlazaLayers.current.page,
-        ),
-        state = navigationSuiteState,
-    ) {
+    val selectTab: (TopLevelDestination) -> Unit = { destination ->
+        // Re-selecting a tab takes its list back to the start — 首页 reloads on the way, since the
+        // one thing a reader taps 首页 for while already on 首页 is 新帖. Only the two tabs that
+        // *are* a list long enough to get lost in answer at all; 我的 stays inert, because a tab
+        // that silently jumps somewhere is worse than one that does nothing.
+        if (destination == currentTab) {
+            when (destination) {
+                TopLevelDestination.HOME -> homeReselectRequests++
+                TopLevelDestination.NOTIFICATIONS -> notificationsScrollToTopRequests++
+                else -> Unit
+            }
+        }
+        currentTab = destination
+    }
+
+    /*
+     * The screen itself, placed by whichever bar this window gets — see the branch below.
+     */
+    val screen: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize()) {
             SharedTransitionLayout(
                 Modifier
@@ -641,6 +618,32 @@ fun MainNavigation(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
+            )
+        }
+    }
+
+    /*
+     * The bar, drawn by the app rather than by `NavigationSuiteScaffold`.
+     *
+     * This is a phone app, so the suite's rail and drawer had nothing to draw on: every window it
+     * was choosing a form for is a window this app never sees. What it did draw — a fixed 65dp
+     * `NavigationBar` with a line reserved for a label the bar no longer has — was 35dp of empty
+     * card under three glyphs. [NodysseyBottomBar] puts the same three items in 48dp instead.
+     *
+     * `Column` rather than a `Scaffold`: the suite placed the screen *above* the bar and handed the
+     * content no padding for it, and every tab root already draws its own `Scaffold` and its own
+     * insets. A `Scaffold` here would take the bar's height off the content a second time.
+     *
+     * The bar still leaves when the feed scrolls down and comes back on a scroll toward the top —
+     * [showBottomBar] is that decision, unchanged; only what it shows is.
+     */
+    Column(modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) { screen() }
+        AnimatedVisibility(visible = showBottomBar) {
+            NodysseyBottomBar(
+                current = currentTab,
+                onSelect = selectTab,
+                unreadCount = notificationsState.counts.all,
             )
         }
     }
@@ -758,7 +761,6 @@ internal fun destinationProvider(
             openSpace = openSpace,
             openContentUrl = openContentUrl,
             openHomeTab = { dependencies.selectTab(TopLevelDestination.HOME) },
-            openProfileTab = { dependencies.selectTab(TopLevelDestination.PROFILE) },
             pendingComposerShare = dependencies.pendingComposerShare,
             pendingAttendance = dependencies.pendingAttendance,
         )
