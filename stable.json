@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "versionName": "1.3.7",
+  "tag": "v1.3.7",
+  "publishedOn": "2026-10-30",
+  "notes": "本次更新重做首页顶栏与底部导航，板块改用图标，并修复「我的」页面的头像圆角。\n\n### 改进\n\n- 首页顶栏合并为一行：搜索、排序、发帖收成图标按钮；发帖从右下角浮动按钮移到顶栏，不再遮住列表最后一行。\n- 首页顶栏不再显示账户头像，进「我的」走底部导航；底部「我的」改为显示账号自己的头像。\n- 板块栏改用图标，与站点侧栏一致，一屏可容纳更多板块。\n- 底部导航栏改为纯图标，高度从 65dp 降到 48dp。\n\n### 修复\n\n- 「我的」页面账户头像左侧两角被外层容器裁切，四角半径不一致。",
+  "apk": {
+    "name": "nodyssey-v1.3.7.apk",
+    "url": "https://github.com/itiao/nodyssey/releases/download/v1.3.7/nodyssey-v1.3.7.apk",
+    "sizeBytes": 11866410,
+    "sha256": "cba8803ab1c2395be0f4042ecc07eac50d7e10e964d25119b4853552f81877c0"
+  },
+  "releaseUrl": "https://github.com/itiao/nodyssey/releases/tag/v1.3.7"
+}
