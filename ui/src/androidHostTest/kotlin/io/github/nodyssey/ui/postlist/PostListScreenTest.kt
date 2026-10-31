@@ -14,13 +14,13 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
@@ -418,8 +418,8 @@ class PostListScreenTest {
 
         feedList().performTouchInput { swipeUp() }
 
-        composeRule.onNodeWithContentDescription("排序方式").assertIsNotDisplayed()
-        composeRule.onNodeWithContentDescription("搜索").assertIsNotDisplayed()
+        // The strip is the whole bar now — there is no header row left to fold — and it is the way
+        // back to another board, so it has to still be on screen after the feed has scrolled.
         composeRule.onNodeWithContentDescription("综合").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("技术").assertIsDisplayed()
         // The header folding is not the feed scrolling. With a collapse limit that never got
@@ -427,29 +427,6 @@ class PostListScreenTest {
         composeRule.runOnIdle {
             assertTrue(listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0)
         }
-    }
-
-    /**
-     * The same fold on a signed-out home, where nothing recomposes the header after its first frame,
-     * and back again: `enterAlways` has to bring the header out on the first drag toward the top
-     * rather than after the reader has paid back however far the offset ran past the header's height.
-     */
-    @Test
-    fun `a swipe back down brings the folded app bar out again`() {
-        setScreen((1..40).map { feedPost(it.toLong(), "post $it") })
-
-        // Found by any row rather than by [feedList]'s "post 1": the feed really scrolls now, and one
-        // fling carries every row with that in its title off screen.
-        val anyFeed = composeRule.onAllNodes(hasScrollAction() and hasAnyDescendant(hasText("post ", substring = true))).onLast()
-        // Twice, so a header that kept folding past its own height would owe more than one swipe
-        // back — which is what an unpublished collapse limit did.
-        anyFeed.performTouchInput { swipeUp() }
-        anyFeed.performTouchInput { swipeUp() }
-        composeRule.onNodeWithContentDescription("排序方式").assertIsNotDisplayed()
-
-        anyFeed.performTouchInput { swipeDown() }
-
-        composeRule.onNodeWithContentDescription("排序方式").assertIsDisplayed()
     }
 
     /**
@@ -489,12 +466,13 @@ class PostListScreenTest {
     }
 
     /**
-     * 排序 is the arrival that does need it: a different order is a different feed, every board
-     * starts at its top, and that arrival is programmatic — there is no upward delta for the bar to
-     * unfold against, and at the top of a list there is nothing left to scroll back up through.
+     * 排序 moved onto 综合 held down, and picking an order still changes the feed.
+     *
+     * The menu used to hang off an icon in the header row; the row is gone, so this is the only way
+     * into it left, and a menu nobody can reach is the same as no menu.
      */
     @Test
-    fun `switching sort unfolds the app bar again`() {
+    fun `holding 综合 offers the two orders and picking one changes the sort`() {
         val posts = (1..40).map { feedPost(it.toLong(), "post $it") }
         var state by mutableStateOf(PostListUiState(boards = boards))
         composeRule.setContent {
@@ -506,18 +484,16 @@ class PostListScreenTest {
                     state = state,
                     onPostClick = {},
                     onBoardClick = {},
-                    onSortChange = {},
+                    onSortChange = { state = state.copy(sort = it) },
                     onRecoverInBrowser = {},
                 )
             }
         }
 
-        feedList().performTouchInput { swipeUp() }
-        composeRule.onNodeWithContentDescription("排序方式").assertIsNotDisplayed()
+        composeRule.onNodeWithContentDescription("综合").performTouchInput { longClick() }
+        composeRule.onNodeWithText("按发帖时间").performClick()
 
-        composeRule.runOnIdle { state = state.copy(sort = FeedSort.POST_TIME) }
-
-        composeRule.onNodeWithContentDescription("排序方式").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(FeedSort.POST_TIME, state.sort) }
     }
 
     /**

@@ -51,8 +51,6 @@ internal fun EntryProviderScope<NavKey>.tabRootEntries(nav: StackEntryScope) = w
                     ),
                 )
             },
-            onCreatePost = { backStack.add(PostComposerKey()) },
-            onSearch = { backStack.add(SearchKey()) },
             onSignIn = {
                 backStack.add(SignInKey)
             },

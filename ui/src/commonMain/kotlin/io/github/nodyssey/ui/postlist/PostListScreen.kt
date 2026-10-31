@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -21,16 +20,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -39,9 +31,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -60,25 +50,21 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import io.github.nodyssey.core.ActiveSite
 import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.core.Site
 import io.github.nodyssey.data.Board
@@ -87,9 +73,7 @@ import io.github.nodyssey.data.OfflineFirstPostRepository
 import io.github.nodyssey.model.FeedSort
 import io.github.nodyssey.model.PostSummary
 import io.github.nodyssey.ui.common.BoardTag
-import io.github.nodyssey.ui.common.CollapsingHeader
 import io.github.nodyssey.ui.common.EmptyFeedState
-import io.github.nodyssey.ui.common.FeedSortOrder
 import io.github.nodyssey.ui.common.JumpDestination
 import io.github.nodyssey.ui.common.LocalThreadTransition
 import io.github.nodyssey.ui.common.NavigationBarScrollConnection
@@ -98,9 +82,7 @@ import io.github.nodyssey.ui.common.PageJumpRail
 import io.github.nodyssey.ui.common.PageJumpSheet
 import io.github.nodyssey.ui.common.PostBadges
 import io.github.nodyssey.ui.common.PostReplyStat
-import io.github.nodyssey.ui.common.SelectableMenuItem
 import io.github.nodyssey.ui.common.SiteErrorState
-import io.github.nodyssey.ui.common.SortMenuItem
 import io.github.nodyssey.ui.common.THREAD_ORIGIN_FEED
 import io.github.nodyssey.ui.common.UserNoteTag
 import io.github.nodyssey.ui.common.collectPagesAtRest
@@ -117,21 +99,12 @@ import io.github.nodyssey.ui.common.snackbarDuration
 import io.github.nodyssey.ui.common.webViewUrl
 import io.github.nodyssey.ui.common.withoutBottom
 import io.github.nodyssey.ui.resources.Res
-import io.github.nodyssey.ui.resources.action_create_post
 import io.github.nodyssey.ui.resources.action_scroll_to_top
-import io.github.nodyssey.ui.resources.action_search
-import io.github.nodyssey.ui.resources.action_sort
-import io.github.nodyssey.ui.resources.action_switch_site
 import io.github.nodyssey.ui.resources.feed_page_size_note
 import io.github.nodyssey.ui.resources.page_jump_newest
 import io.github.nodyssey.ui.resources.post_badge_pinned
 import io.github.nodyssey.ui.resources.post_last_reply_by
 import io.github.nodyssey.ui.resources.post_view_count
-import io.github.nodyssey.ui.resources.site_switch_next_launch
-import io.github.nodyssey.ui.resources.site_switch_separate_sessions
-import io.github.nodyssey.ui.resources.site_switch_signed_in_as
-import io.github.nodyssey.ui.settings.rememberSiteSwitch
-import io.github.nodyssey.ui.settings.siteSwitchRestartsApp
 import io.github.plaza.core.TimeFormat
 import io.github.plaza.designsys.component.AppendSpinner
 import io.github.plaza.designsys.component.AvatarShape
@@ -143,11 +116,8 @@ import io.github.plaza.designsys.component.PlazaIcons
 import io.github.plaza.designsys.component.PrefetchAvatars
 import io.github.plaza.designsys.component.SkeletonBar
 import io.github.plaza.designsys.component.UserAvatar
-import io.github.plaza.designsys.theme.LocalPlazaLayers
 import io.github.plaza.designsys.theme.PlazaTheme
 import io.github.plaza.designsys.theme.Spacing
-import io.github.plaza.designsys.theme.cardBorder
-import io.github.plaza.designsys.theme.cardShadow
 import io.github.plaza.designsys.theme.readableWidth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -166,8 +136,6 @@ fun PostListRoute(
     viewModel: PostListViewModel,
     feedStates: HomeFeedStates,
     onPostClick: (FeedPost) -> Unit,
-    onCreatePost: () -> Unit,
-    onSearch: () -> Unit,
     onSignIn: () -> Unit,
     onVerify: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -181,8 +149,6 @@ fun PostListRoute(
         postsFor = { slug -> viewModel.feed(slug).collectAsLazyPagingItems() },
         feedStates = feedStates,
         onPostClick = onPostClick,
-        onCreatePost = onCreatePost,
-        onSearch = onSearch,
         onBoardClick = viewModel::selectCategory,
         onArrangementChange = viewModel::saveBoardArrangement,
         onSortChange = viewModel::selectSort,
@@ -239,9 +205,6 @@ fun PostListScreen(
     feedStates: HomeFeedStates = rememberSaveable(saver = HomeFeedStates.Saver) { HomeFeedStates() },
     /** Commits an edit made on the board strip itself: the pill order, and which boards are parked. */
     onArrangementChange: (order: List<String>, parked: Set<String>) -> Unit = { _, _ -> },
-    onCreatePost: () -> Unit = {},
-    /** Opens 搜索 on top of this list, from the app bar's own action. */
-    onSearch: () -> Unit = {},
     /** Keeps the host navigation bar hidden until the user deliberately scrolls toward the list start. */
     onNavigationBarHiddenChanged: (Boolean) -> Unit = {},
     /**
@@ -324,27 +287,6 @@ fun PostListScreen(
         }
 
     /*
-     * The 排序 / 搜索 row rides the scroll; the board strip under it does not.
-     *
-     * Only the app bar is given a scroll behaviour, so the strip — which is navigation, and the one
-     * thing a reader reaches for mid-feed — stays put while 排序 and 搜索 fold away. `enterAlways`
-     * rather than the navigation bar's sticky threshold: the bar is what those two live in, and a
-     * short drag back up has to be enough to reach them.
-     */
-    val topBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
-    /**
-     * Unfolds the app bar without a gesture, for the jumps that put the list back at its first row.
-     *
-     * The bar collapses only against scroll deltas it has consumed, so a programmatic scroll leaves it
-     * folded at the top of the feed — the one place there is nothing left to scroll back up through.
-     */
-    fun revealTopBar() {
-        topBarScrollBehavior.state.heightOffset = 0f
-        topBarScrollBehavior.state.contentOffset = 0f
-    }
-
-    /*
      * Arriving somewhere the reader did not scroll to unfolds the app bar, and a jump also throws the
      * offset away.
      *
@@ -375,7 +317,6 @@ fun PostListScreen(
         lastSort = state.sort.name
         lastStartPage = state.startPage
         if (!sortChanged && !jumped) return@LaunchedEffect
-        revealTopBar()
         if (jumped) listState.scrollToItem(0)
     }
 
@@ -392,7 +333,6 @@ fun PostListScreen(
     val scope = rememberCoroutineScope()
     suspend fun scrollToTop() {
         navigationBarScrollConnection.reveal()
-        revealTopBar()
         // Animating hundreds of rows past would take seconds and show nothing. Jumping to the last
         // screenful first costs the same gesture a fixed, short animation however deep the user is.
         if (listState.firstVisibleItemIndex > SCROLL_TO_TOP_ANIMATED_ITEMS) {
@@ -400,8 +340,8 @@ fun PostListScreen(
         }
         listState.animateScrollToItem(0)
     }
-    val scrolledFromTop by remember(listState, topBarScrollBehavior) {
-        derivedStateOf { listState.canScrollBackward || topBarScrollBehavior.state.heightOffset < 0f }
+    val scrolledFromTop by remember(listState) {
+        derivedStateOf { listState.canScrollBackward }
     }
     /*
      * Which request has already been answered, remembered exactly as the board identity above is and
@@ -551,15 +491,15 @@ fun PostListScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column {
-                HomeHeader(
-                    sort = state.sort,
-                    onSortChange = onSortChange,
-                    onSearch = onSearch,
-                    onCreatePost = onCreatePost,
-                    account = state.account,
-                    scrollBehavior = topBarScrollBehavior,
-                )
+            /*
+             * The strip is the whole bar now.
+             *
+             * The row above it is gone: 搜索 and 发帖 went down to the bottom bar, 排序 to the strip's
+             * first pill held down, and the wordmark with the site switcher it opened — this app
+             * talks to one site. What is left takes the status-bar inset the header used to, so the
+             * pills sit exactly where they did under it.
+             */
+            Box(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
                 BoardStrip(
                     boards = state.boards,
                     parkedBoards = state.parkedBoards,
@@ -578,6 +518,8 @@ fun PostListScreen(
                     },
                     onBoardClick = onBoardClick,
                     onArrangementChange = onArrangementChange,
+                    sort = state.sort,
+                    onSortChange = onSortChange,
                 )
             }
         },
@@ -610,7 +552,6 @@ fun PostListScreen(
                     onRecoverInBrowser = onRecoverInBrowser,
                     onBrowseElsewhere = { onBoardClick(null) },
                     navigationBarScrollConnection = navigationBarScrollConnection,
-                    topBarScrollBehavior = topBarScrollBehavior,
                     bottomInset = bottomInset,
                 )
             }
@@ -690,7 +631,6 @@ private fun BoardFeed(
     onRecoverInBrowser: (String) -> Unit,
     onBrowseElsewhere: () -> Unit,
     navigationBarScrollConnection: NavigationBarScrollConnection,
-    topBarScrollBehavior: TopAppBarScrollBehavior,
     /** The bottom bar's height, which the list scrolls under rather than stopping at. */
     bottomInset: Dp,
 ) {
@@ -762,7 +702,6 @@ private fun BoardFeed(
                         // the first 64dp of every downward scroll into its own collapse
                         // and the navigation bar would only start hiding afterwards.
                         .nestedScroll(navigationBarScrollConnection)
-                        .nestedScroll(topBarScrollBehavior.nestedScrollConnection)
                         .readableWidth(),
                     // Room under the last card for the FAB, so the foot of the feed can be read
                     // without the button sitting on it.
@@ -865,284 +804,6 @@ private const val FIRST_PAGE = 1
  * meanwhile, so nothing about the wait is invisible.
  */
 private const val APPEND_WAIT_MILLIS = 15_000L
-
-/**
- * The home header: one line — 站点 on the left, then 搜索, 排序 and 发帖 on the right.
- *
- * It folds away as the feed advances and comes back on any scroll toward the top — `enterAlways`,
- * the same as the navigation bar — while the board strip under it stays pinned, since it is
- * navigation and the one thing a reader reaches for mid-feed.
- *
- * A [CollapsingHeader] rather than a `TopAppBar`: the bar is still a wordmark button and a run of
- * icon actions, which a `TopAppBar` could hold, but its scroll contract is the half that matters and
- * [CollapsingHeader] is what keeps it — publishing the collapse limit from its measure pass.
- * Publishing it from anywhere the header does not recompose leaves the limit at `-Float.MAX_VALUE`,
- * and `enterAlways` then swallows every vertical drag before the feed sees it.
- *
- * 搜索 is an icon rather than a field: tapping it opens the search screen, where the real `SearchBar`
- * lives with its tabs and history. Typing here would have to duplicate all of that. 发帖 is an icon
- * for the same reason it used to be a floating button — it is the one action on this screen that
- * starts something rather than goes somewhere — and it sits in this row now instead of floating over
- * the corner of the feed, where it covered the last row and had to be kept clear of by padding.
- *
- * The account's face is not up here any more. It opened 我的, and the bottom bar already has that tab
- * one thumb away; a second door to the same screen at the top of the feed only ever cost the row the
- * width the three actions needed.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeHeader(
-    sort: FeedSort,
-    onSortChange: (FeedSort) -> Unit,
-    onSearch: () -> Unit,
-    onCreatePost: () -> Unit,
-    account: HomeAccount?,
-    scrollBehavior: TopAppBarScrollBehavior,
-) {
-    CollapsingHeader(
-        scrollBehavior = scrollBehavior,
-        modifier = Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // The site button's own 8dp inset puts the wordmark on the 16dp margin, and the
-                // last tile stops on the same one.
-                .padding(horizontal = Spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(HeaderControlGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // The wordmark takes what the actions leave, and truncates rather than pushing them off.
-            SiteSwitcher(account = account, modifier = Modifier.weight(1f))
-            HeaderIconButton(
-                icon = Icons.Default.Search,
-                contentDescription = stringResource(Res.string.action_search),
-                onClick = onSearch,
-            )
-            SortButton(sort = sort, onSortChange = onSortChange)
-            HeaderIconButton(
-                icon = Icons.Default.Edit,
-                contentDescription = stringResource(Res.string.action_create_post),
-                onClick = onCreatePost,
-                prominent = true,
-            )
-        }
-    }
-}
-
-/**
- * 28dp: the size of every control in the header.
- *
- * It was the account's face, which sat at the end of this row until 我的 took over the job — the
- * bottom bar has the tab, so a face up here was a second way into the same screen. The three actions
- * took its size when it left, which is what keeps the row reading as one set of controls rather than
- * one big one and three small ones. Compose still hit-tests them at 48.
- */
-private val HeaderControlSize = 28.dp
-
-/**
- * Between the header's controls.
- *
- * Wide enough that the three tiles read as three things rather than one segmented control: at 28dp
- * a 6dp gap is a fifth of a tile, which at this size is a seam, not a space.
- */
-private val HeaderControlGap = 12.dp
-
-/** The glyphs in the header's controls, a step under Material's 24dp. */
-private val HeaderIconSize = 18.dp
-
-/**
- * The glyph inside one of the header's action tiles.
- *
- * The tile is [HeaderControlSize] and the glyph keeps the ratio Material gives a 24dp glyph in a
- * 40dp button, so the row reads as three controls of one weight rather than three glyphs fighting
- * their frames.
- */
-private val HeaderActionIconSize = HeaderIconSize
-
-/**
- * One of the header's icon actions: 搜索, 排序, 发帖.
- *
- * [prominent] is 发帖's: the only action up here that starts something rather than going somewhere,
- * and the tone the floating button it replaced was drawn in, so the reader's eye still lands on it
- * first. Everything else takes the raised tone, which on 墨水屏 is the page's paper — that, plus the
- * border, is the only edge these tiles have there.
- */
-@Composable
-private fun HeaderIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    prominent: Boolean = false,
-) {
-    val layers = LocalPlazaLayers.current
-    val shape = MaterialTheme.shapes.medium
-    FilledIconButton(
-        onClick = onClick,
-        shape = shape,
-        modifier = Modifier
-            .size(HeaderControlSize)
-            .cardShadow(shape, layers.shadows)
-            .cardBorder(layers, shape),
-        colors =
-        IconButtonDefaults.filledIconButtonColors(
-            containerColor = if (prominent) MaterialTheme.colorScheme.primaryContainer else layers.raised,
-            contentColor =
-            if (prominent) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        ),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(HeaderActionIconSize),
-        )
-    }
-}
-
-/** 排序, as a tile beside 搜索 with its menu anchored under it. */
-@Composable
-private fun SortButton(
-    sort: FeedSort,
-    onSortChange: (FeedSort) -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Box {
-        HeaderIconButton(
-            icon = PlazaIcons.SwapVert,
-            contentDescription = stringResource(Res.string.action_sort),
-            onClick = { menuOpen = true },
-        )
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            FeedSortOrder.forEach { order ->
-                SortMenuItem(order, sort) {
-                    onSortChange(it)
-                    menuOpen = false
-                }
-            }
-        }
-    }
-}
-
-/**
- * 站点: which forum the feed below came from, and the way to the other one.
- *
- * A text button rather than a title, because it is one. The site's own wordmark rather than a
- * translated label — NodeSeek and DeepFlood are what the sites call themselves in every language the
- * app ships.
- *
- * The menu is anchored to the button and centred with it. Both entries are always listed, the
- * current one ticked, which is the same shape 排序 uses two slots to the left; a reader who opens it
- * to check where they are should not have to change anything to find out.
- *
- * Android rebuilds the site's navigation and services in place. On a platform that defers the
- * change until the next launch, the menu explains that beside the selected site.
- */
-@Composable
-private fun SiteSwitcher(
-    account: HomeAccount?,
-    modifier: Modifier = Modifier,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    val active = ActiveSite.current
-    val switchSite = rememberSiteSwitch()
-
-    Box(modifier) {
-        TextButton(onClick = { menuOpen = true }, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
-            Text(
-                text = active.displayName,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                // The wordmark shares the row with four controls now; on a narrow window it gives
-                // way rather than pushing 发帖 off the edge.
-                overflow = TextOverflow.Ellipsis,
-            )
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                // The button already reads out the site's name; the arrow only says it opens.
-                contentDescription = stringResource(Res.string.action_switch_site),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 2.dp).size(HeaderIconSize),
-            )
-        }
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-            shape = MaterialTheme.shapes.largeIncreased,
-            containerColor = LocalPlazaLayers.current.card,
-            modifier = Modifier.widthIn(min = 280.dp),
-        ) {
-            Site.entries.forEachIndexed { index, site ->
-                val isCurrent = site == active
-                SelectableMenuItem(
-                    selected = isCurrent,
-                    index = index,
-                    count = Site.entries.size,
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    site.displayName,
-                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                                )
-                                Text(
-                                    site.domain,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            // Who is signed in, for the site that can say: the other one's cookies are
-                            // not read until it is switched to, so its line stays silent rather than
-                            // guessing.
-                            if (isCurrent && account != null) {
-                                Text(
-                                    text = stringResource(Res.string.site_switch_signed_in_as, account.name),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            // 下次启动生效 under the name it applies to rather than as a note
-                            // elsewhere on the screen: the sentence is only true of this entry, and
-                            // only on a platform that cannot restart itself.
-                            if (!isCurrent && !siteSwitchRestartsApp) {
-                                Text(
-                                    text = stringResource(Res.string.site_switch_next_launch),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                    onClick = {
-                        menuOpen = false
-                        switchSite(site)
-                    },
-                    leadingIcon = { SiteMonogram(site, index) },
-                    modifier = Modifier.heightIn(min = 64.dp),
-                )
-            }
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = Spacing.xs),
-            )
-            Text(
-                text = stringResource(Res.string.site_switch_separate_sessions),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .widthIn(max = 280.dp)
-                    .padding(start = 18.dp, end = 18.dp, top = Spacing.xs, bottom = Spacing.sm),
-            )
-        }
-    }
-}
 
 /** A site's initial on a tonal tile — the two sites told apart by colour family, first by primary. */
 @Composable

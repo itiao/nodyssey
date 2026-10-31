@@ -38,6 +38,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -84,6 +85,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import io.github.nodyssey.data.Board
+import io.github.nodyssey.model.FeedSort
+import io.github.nodyssey.ui.common.FeedSortOrder
+import io.github.nodyssey.ui.common.SortMenuItem
 import io.github.nodyssey.ui.common.boardFamilyColors
 import io.github.nodyssey.ui.common.boardFamilyOf
 import io.github.nodyssey.ui.common.longPressToEdit
@@ -155,7 +159,13 @@ internal fun BoardStrip(
     highlightedSlug: String?,
     onBoardClick: (String?) -> Unit,
     onArrangementChange: (order: List<String>, parked: Set<String>) -> Unit,
+    // The feed's order, and the way to change it. It lives here because the sort menu's home is the
+    // first pill — 综合 — held down: the header that used to own it is gone, and a menu needs an
+    // anchor, which the strip is the only thing left to give it.
+    sort: FeedSort = FeedSort.LAST_REPLY,
+    onSortChange: (FeedSort) -> Unit = {},
 ) {
+    var sortMenuOpen by remember { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var editing by rememberSaveable { mutableStateOf(false) }
     val rowState = rememberLazyListState()
@@ -286,11 +296,36 @@ internal fun BoardStrip(
                     ) {
                         items(count = boards.size, key = { boards[it].slug ?: FRONT_PAGE_KEY }) { index ->
                             val board = boards[index]
-                            BoardPill(
-                                board = board,
-                                selected = board.slug == highlightedSlug,
-                                onClick = { onBoardClick(board.slug) },
-                            )
+                            if (index == 0) {
+                                // 综合 is where the sort menu lives now: held down, it offers the two
+                                // orders the header's own button used to. Anchored to the pill rather
+                                // than to the strip, so the menu opens under the finger.
+                                Box {
+                                    BoardPill(
+                                        board = board,
+                                        selected = board.slug == highlightedSlug,
+                                        onClick = { onBoardClick(board.slug) },
+                                        modifier = Modifier.longPressToEdit { sortMenuOpen = true },
+                                    )
+                                    DropdownMenu(
+                                        expanded = sortMenuOpen,
+                                        onDismissRequest = { sortMenuOpen = false },
+                                    ) {
+                                        FeedSortOrder.forEach { order ->
+                                            SortMenuItem(order, sort) {
+                                                onSortChange(it)
+                                                sortMenuOpen = false
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                BoardPill(
+                                    board = board,
+                                    selected = board.slug == highlightedSlug,
+                                    onClick = { onBoardClick(board.slug) },
+                                )
+                            }
                         }
                     }
                     // The scrolling row stops where the toggle starts, rather than running under it.
@@ -720,6 +755,7 @@ private fun BoardPill(
     board: Board,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     editing: Boolean = false,
 ) {
     val colors =
@@ -753,7 +789,7 @@ private fun BoardPill(
         // A chip reads as "select this"; while editing its tap does something else, and TalkBack says
         // what. A null action keeps the chip's own, and only names it.
         modifier =
-        Modifier
+        modifier
             .height(PillHeight)
             .then(if (editing) Modifier.semantics { onClick(label = parkLabel, action = null) } else Modifier),
         trailingIcon =

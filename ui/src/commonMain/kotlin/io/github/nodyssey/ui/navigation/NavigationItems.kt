@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
@@ -44,6 +46,8 @@ import io.github.nodyssey.PostListKey
 import io.github.nodyssey.ProfileKey
 import io.github.nodyssey.ui.postlist.HomeAccount
 import io.github.nodyssey.ui.resources.Res
+import io.github.nodyssey.ui.resources.action_create_post
+import io.github.nodyssey.ui.resources.action_search
 import io.github.nodyssey.ui.resources.tab_home
 import io.github.nodyssey.ui.resources.tab_notifications
 import io.github.nodyssey.ui.resources.tab_profile
@@ -83,7 +87,7 @@ enum class TopLevelDestination(
     }
 }
 
-private val NavigationIconSize = 20.dp
+private val NavigationIconSize = 24.dp
 
 /**
  * 首页 / 通知 / 我的 as a bar of the app's own, for the windows the suite draws a bar in.
@@ -108,6 +112,10 @@ fun NodysseyBottomBar(
     unreadCount: Int = 0,
     /** The signed-in face 我的 draws in place of its glyph, and null while signed out. */
     account: HomeAccount? = null,
+    // The two actions that are not tabs. They used to sit in 首页's own bar; that row is gone, and
+    // these are the two of its three buttons that start something rather than belong to the feed.
+    onSearch: () -> Unit = {},
+    onCreatePost: () -> Unit = {},
 ) {
     Surface(color = LocalPlazaLayers.current.card, modifier = modifier.fillMaxWidth()) {
         Row(
@@ -119,17 +127,73 @@ fun NodysseyBottomBar(
                 .height(BottomBarHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TopLevelDestination.entries.forEach { destination ->
-                BottomBarItem(
-                    destination = destination,
-                    selected = destination == current,
-                    unreadCount = unreadCount,
-                    account = account,
-                    onClick = { onSelect(destination) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            BottomBarItem(
+                destination = TopLevelDestination.HOME,
+                selected = current == TopLevelDestination.HOME,
+                unreadCount = unreadCount,
+                account = account,
+                onClick = { onSelect(TopLevelDestination.HOME) },
+                modifier = Modifier.weight(1f),
+            )
+            BottomBarAction(
+                icon = Icons.Default.Search,
+                label = stringResource(Res.string.action_search),
+                onClick = onSearch,
+                modifier = Modifier.weight(1f),
+            )
+            BottomBarItem(
+                destination = TopLevelDestination.NOTIFICATIONS,
+                selected = current == TopLevelDestination.NOTIFICATIONS,
+                unreadCount = unreadCount,
+                account = account,
+                onClick = { onSelect(TopLevelDestination.NOTIFICATIONS) },
+                modifier = Modifier.weight(1f),
+            )
+            BottomBarAction(
+                icon = Icons.Default.Edit,
+                label = stringResource(Res.string.action_create_post),
+                onClick = onCreatePost,
+                modifier = Modifier.weight(1f),
+            )
+            BottomBarItem(
+                destination = TopLevelDestination.PROFILE,
+                selected = current == TopLevelDestination.PROFILE,
+                unreadCount = unreadCount,
+                account = account,
+                onClick = { onSelect(TopLevelDestination.PROFILE) },
+                modifier = Modifier.weight(1f),
+            )
         }
+    }
+}
+
+/**
+ * One of the bar's two actions — 搜索 and 发帖.
+ *
+ * An action, not a tab: it starts something and leaves, so it has no selected state and no pill. It
+ * takes the same share of the row and the same glyph size as the tabs beside it, because a row where
+ * two of five items were drawn smaller reads as two classes of button.
+ */
+@Composable
+private fun BottomBarAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(NavigationIconSize),
+        )
     }
 }
 
@@ -197,13 +261,13 @@ private fun BottomBarItem(
     }
 }
 
-/** 48dp: the row the three glyphs sit in, without the system's gesture inset under it. */
-val BottomBarHeight = 48.dp
+/** 56dp: the row the glyphs sit in, without the system's gesture inset under it. */
+val BottomBarHeight = 56.dp
 
-/** The pill around the selected glyph, a step under Material's 64×32 so it fits a 48dp row. */
-private val IndicatorWidth = 56.dp
+/** The pill around the selected glyph, a step under Material's 64×32 so it fits a 56dp row. */
+private val IndicatorWidth = 64.dp
 
-private val IndicatorHeight = 26.dp
+private val IndicatorHeight = 32.dp
 
 /** Far enough along the row that the badge clears the pill's shoulder rather than sitting on it. */
 private val BadgeOffsetX = 18.dp

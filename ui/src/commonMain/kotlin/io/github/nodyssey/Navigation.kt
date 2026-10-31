@@ -672,6 +672,10 @@ fun MainNavigation(
                 onSelect = selectTab,
                 unreadCount = notificationsState.counts.all,
                 account = selfAccount,
+                // Both land on the current tab's stack, the way they did from 首页's own bar: 搜索
+                // closes back to the list it was opened from, and 发帖 closes back to it once posted.
+                onSearch = { backStack.add(SearchKey()) },
+                onCreatePost = { backStack.add(PostComposerKey()) },
             )
         }
     }

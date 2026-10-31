@@ -8,9 +8,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
 import androidx.paging.PagingData
@@ -144,20 +146,11 @@ class PostListScreenRenderTest {
     @Test
     fun `the sort menu in light`() {
         composeRule.setContent { Screen(darkTheme = false) }
-        composeRule.onNodeWithContentDescription("排序方式").performClick()
+        // 排序 lives on 综合 held down now that the header row is gone.
+        composeRule.onNodeWithContentDescription("综合").performTouchInput { longClick() }
         composeRule.waitForIdle()
 
         captureScreenRoboImage(filePath = "build/outputs/renders/post-list-sort-light.png")
-    }
-
-    @OptIn(ExperimentalRoborazziApi::class)
-    @Test
-    fun `the site switcher in light`() {
-        composeRule.setContent { Screen(darkTheme = false) }
-        composeRule.onNodeWithContentDescription("切换站点").performClick()
-        composeRule.waitForIdle()
-
-        captureScreenRoboImage(filePath = "build/outputs/renders/post-list-sites-light.png")
     }
 
     /** The board strip opened over the feed: every board as a wrapped grid of pills. */
