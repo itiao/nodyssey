@@ -35,7 +35,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -67,6 +70,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -828,6 +832,11 @@ fun PostDetailScreen(
                                 LocalReportOrigin provides ReportOrigin(state.postId, state.title),
                                 // 1a: a long press on a picture in any floor opens the sheet above.
                                 LocalImageActions provides imageActions.open,
+                                // 收藏 is the thread's, so every floor's foot reads it from here.
+                                LocalThreadCollect provides
+                                    state.collected?.let { collected ->
+                                        ThreadCollect(collected) { if (state.isSignedIn) onCollect() else onSignIn() }
+                                    },
                             ) {
                                 ThreadList(
                                     state = state,
@@ -1414,6 +1423,7 @@ private fun ThreadList(
                         pendingReaction = state.pendingReactionFor(comment),
                         onReact = { action -> onReact(comment, action) },
                         onReply = onReply,
+                        onQuote = onQuote,
                         onEdit = onEdit,
                         onMore = { onOpenFloorActions(FloorActions(comment, onReply, onQuote, onEdit)) },
                         onAuthorClick = onAuthorClick,
@@ -2282,6 +2292,7 @@ private fun OriginalCommentRow(
     onReact: (ReactionAction) -> Unit,
     /** Null on this account's own floor, where [onEdit] takes its place. */
     onReply: (() -> Unit)?,
+    onQuote: () -> Unit,
     onEdit: (() -> Unit)?,
     onMore: () -> Unit,
     onAuthorClick: (Long) -> Unit,
@@ -2364,6 +2375,7 @@ private fun OriginalCommentRow(
                     pending = pendingReaction,
                     onReact = onReact,
                     onReply = onReply,
+                    onQuote = onQuote,
                     onEdit = onEdit,
                     onMore = onMore,
                     modifier = Modifier.floorLongPress(onMore),
@@ -2386,6 +2398,7 @@ private fun OriginalCommentFoot(
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
     onReply: (() -> Unit)?,
+    onQuote: () -> Unit,
     onEdit: (() -> Unit)?,
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
@@ -2393,29 +2406,17 @@ private fun OriginalCommentFoot(
     // The official row is 30dp tall; Material's 48dp minimum touch target would put the gap back
     // between the body and the divider that this style is meant to remove.
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-        FlowRow(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg).forEach { action ->
-                FloorActionButton(
-                    icon = action.icon(),
-                    label = action.labelRes(),
-                    count = reactions?.countOf(action)?.takeIf { it > 0 }?.toString().orEmpty(),
-                    spent = reactions?.hasSpent(action) == true,
-                    pending = pending == action,
-                    onClick = if (reactions != null && pending == null) ({ onReact(action) }) else null,
-                    compact = true,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            when {
-                onEdit != null -> FloorActionButton(Icons.Default.Edit, Res.string.post_edit_action, onClick = onEdit, compact = true)
-                onReply != null -> FloorActionButton(PlazaIcons.Reply, Res.string.post_reply_action, onClick = onReply, compact = true)
-            }
-            FloorMoreButton(onMore, compact = true)
-        }
+        FloorFoot(
+            reactions = reactions,
+            pending = pending,
+            onReact = onReact,
+            onReply = onReply,
+            onQuote = onQuote,
+            onEdit = onEdit,
+            onMore = onMore,
+            modifier = modifier,
+            compact = true,
+        )
     }
 }
 
@@ -2557,12 +2558,12 @@ private fun OpeningPostActions(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg).forEach { action ->
+        listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg, ReactionAction.Dislike).forEach { action ->
             ReactionPill(action, reactions, pending, onReact)
         }
         if (collected != null) {
             FloorActionButton(
-                icon = if (collected) PlazaIcons.Bookmark else PlazaIcons.BookmarkBorder,
+                icon = if (collected) Icons.Filled.Star else Icons.Outlined.Star,
                 label = if (collected) Res.string.post_collected_action else Res.string.post_collect_action,
                 count = collectionCount?.takeIf { it > 0 }?.toString().orEmpty(),
                 selected = collected,
@@ -2599,7 +2600,7 @@ private fun OriginalOpeningActions(
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg).forEach { action ->
+            listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg, ReactionAction.Dislike).forEach { action ->
                 val count = reactions?.countOf(action)?.toString()
                 val text =
                     if (action == ReactionAction.ChickenLeg) {
@@ -2622,7 +2623,7 @@ private fun OriginalOpeningActions(
             ) {
                 if (collected != null) {
                     FloorActionButton(
-                        icon = if (collected) PlazaIcons.Bookmark else PlazaIcons.BookmarkBorder,
+                        icon = if (collected) Icons.Filled.Star else Icons.Outlined.Star,
                         label = if (collected) Res.string.post_collected_action else Res.string.post_collect_action,
                         count = collectionCount?.toString().orEmpty(),
                         selected = collected,
@@ -2718,20 +2719,83 @@ private fun CommentFoot(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(
+    FloorFoot(
+        reactions = reactions,
+        pending = pending,
+        onReact = onReact,
+        onReply = onReply,
+        onQuote = onQuote,
+        onEdit = onEdit,
+        onMore = onMore,
+        modifier = modifier,
+        // The site's own foot is a dense row of glyphs; six marks plus 引用/回复/⋯ at 44dp each is
+        // wider than a phone, and this is the row the reader taps rather than reads.
+        compact = true,
+    )
+}
+
+/**
+ * A floor's whole foot, in the site's own order: 点赞, 鸡腿, 反对, 收藏, then 引用 and 回复 — every one
+ * of them a glyph with no word beside it, which is how the site draws the same row.
+ *
+ * It used to be two different rows depending on the reply style, and neither was complete: the 1.3.4
+ * foot had 引用 and 回复 but no 鸡腿 or 反对, the official one had 鸡腿 but neither 引用 nor 反对. The
+ * marks now sit together on both, and 收藏 — which belongs to the thread rather than the floor —
+ * comes from [LocalThreadCollect].
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FloorFoot(
+    reactions: PostReactions?,
+    pending: ReactionAction?,
+    onReact: (ReactionAction) -> Unit,
+    onReply: (() -> Unit)?,
+    onQuote: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
+    onMore: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val collect = LocalThreadCollect.current
+    // A Row, not a FlowRow: the two groups are pinned to opposite ends by a weighted spacer, and a
+    // FlowRow has no such spacer — the weight ate the line and wrapped 回复 onto a second one.
+    Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        itemVerticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ReactionPill(ReactionAction.Upvote, reactions, pending, onReact)
-        Spacer(Modifier.weight(1f))
-        FloorActionButton(PlazaIcons.FormatQuote, Res.string.post_quote_action, onClick = onQuote)
-        when {
-            onEdit != null -> FloorActionButton(Icons.Default.Edit, Res.string.post_edit_action, onClick = onEdit)
-            onReply != null -> FloorActionButton(PlazaIcons.Reply, Res.string.post_reply_action, onClick = onReply)
+        // 点赞 / 鸡腿 / 反对 — the three marks, in the enum's order, which is the site's.
+        ReactionAction.entries.forEach { action ->
+            FloorActionButton(
+                icon = action.icon(),
+                label = action.labelRes(),
+                count = reactions?.countOf(action)?.takeIf { it > 0 }?.toString().orEmpty(),
+                spent = reactions?.hasSpent(action) == true,
+                pending = pending == action,
+                onClick = if (reactions != null && pending == null) ({ onReact(action) }) else null,
+                compact = compact,
+            )
         }
-        FloorMoreButton(onMore)
+        if (collect != null) {
+            FloorActionButton(
+                icon = if (collect.collected) Icons.Filled.Star else Icons.Outlined.Star,
+                label = if (collect.collected) Res.string.post_collected_action else Res.string.post_collect_action,
+                selected = collect.collected,
+                onClick = collect.onCollect,
+                compact = compact,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        if (onQuote != null) {
+            FloorActionButton(PlazaIcons.FormatQuote, Res.string.post_quote_action, onClick = onQuote, compact = compact)
+        }
+        when {
+            onEdit != null -> FloorActionButton(Icons.Default.Edit, Res.string.post_edit_action, onClick = onEdit, compact = compact)
+            onReply != null -> FloorActionButton(PlazaIcons.Reply, Res.string.post_reply_action, onClick = onReply, compact = compact)
+        }
+        // No ⋯ here: six glyphs and the badge is all a phone's width holds, and the panel it opened
+        // — 复制正文, 举报, the priced marks — is still a long press on the floor, which is where the
+        // row already says to look. See [floorLongPress].
     }
 }
 
@@ -2822,8 +2886,12 @@ private fun footLabelStyle(): TextStyle =
 /** Each mark's glyph, wherever it is drawn — the row, the pill, the 1c tile. */
 private fun ReactionAction.icon(): ImageVector =
     when (this) {
-        ReactionAction.Upvote -> Icons.Default.ThumbUp
+        // Outlined rather than filled: the site draws these three as line marks, and a filled thumb
+        // beside a line-drawn star and quote reads as a different weight of button.
+        ReactionAction.Upvote -> Icons.Outlined.ThumbUp
+
         ReactionAction.ChickenLeg -> NodeSeekIcons.ChickenLeg
+
         ReactionAction.Dislike -> PlazaIcons.ThumbDown
     }
 
@@ -2906,6 +2974,18 @@ private fun ReactionConfirmDialog(
         },
     )
 }
+
+/**
+ * 收藏 for the thread, handed to every floor's foot.
+ *
+ * A composition local rather than six more parameters: 收藏 belongs to the thread, not the floor, so
+ * it is the same value and the same action at every depth — and threading it through
+ * ThreadList → CommentRow → CommentFoot would have added two arguments to three signatures to say
+ * the one thing. Null while the state does not know yet, or for a reader who cannot collect.
+ */
+private data class ThreadCollect(val collected: Boolean, val onCollect: () -> Unit)
+
+private val LocalThreadCollect = compositionLocalOf<ThreadCollect?> { null }
 
 /**
  * What a floor's 1c panel can do besides the three marks, as that floor's own row already wired it.

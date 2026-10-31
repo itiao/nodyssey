@@ -368,8 +368,9 @@ class PostDetailScreenRenderTest {
 
     private fun floorPanel(darkTheme: Boolean) {
         composeRule.setContent { Screen(darkTheme = darkTheme) }
-        // Open through its semantics action so this capture does not depend on scroll placement.
-        composeRule.onAllNodesWithContentDescription("楼层操作")[1].performSemanticsAction(SemanticsActions.OnClick)
+        // The reply foot carries six glyphs and no ⋯ now, so the panel opens the way the row says
+        // it does: a long press on the floor.
+        composeRule.onAllNodesWithContentDescription("楼层操作")[0].performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
         captureWindows("post-detail-actions-${if (darkTheme) "dark" else "light"}")
