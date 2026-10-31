@@ -177,6 +177,7 @@ import io.github.nodyssey.ui.resources.post_edit_action
 import io.github.nodyssey.ui.resources.post_edited
 import io.github.nodyssey.ui.resources.post_edited_at
 import io.github.nodyssey.ui.resources.post_floor_actions
+import io.github.nodyssey.ui.resources.post_floor_jump
 import io.github.nodyssey.ui.resources.post_floor_number
 import io.github.nodyssey.ui.resources.post_link_copied
 import io.github.nodyssey.ui.resources.post_loading_earlier
@@ -744,6 +745,7 @@ fun PostDetailScreen(
                 collected = state.collected,
                 collectPending = state.collectPending,
                 onCollect = { if (state.isSignedIn) onCollect() else onSignIn() },
+                onJumpToFloor = { showPageSheet = true },
                 pageColor = threadPageColor(state.postReplyStyle),
             )
         },
@@ -872,9 +874,6 @@ fun PostDetailScreen(
 
             if (state.hasContent && !replyOpen) {
                 ThreadReadingControls(
-                    currentFloor = displayedFloor,
-                    lastFloor = lastFloor,
-                    onJump = { showPageSheet = true },
                     onReply = { onReply(null) },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
@@ -1062,6 +1061,8 @@ private fun DetailTopBar(
     collected: Boolean?,
     collectPending: Boolean,
     onCollect: () -> Unit,
+    /** 跳楼, which used to hang off the reading pill at the foot of the thread. */
+    onJumpToFloor: (() -> Unit)? = null,
     pageColor: Color,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1124,6 +1125,15 @@ private fun DetailTopBar(
                     onOriginal?.let { jump ->
                         DropdownMenuItem(
                             text = { Text(openOriginalPostLabel) },
+                            onClick = {
+                                menuOpen = false
+                                jump()
+                            },
+                        )
+                    }
+                    onJumpToFloor?.let { jump ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.post_floor_jump)) },
                             onClick = {
                                 menuOpen = false
                                 jump()
@@ -2795,10 +2805,12 @@ private fun FloorActionButton(
                 modifier = Modifier.size(glyphSize).offset(y = glyphOffset),
             )
         }
+        // Icons only, as the site's own row draws them: 引用 and 回复 are a quote mark and an arrow,
+        // and spelling them out beside those marks doubled the width of every foot for a word the
+        // glyph already says. The names are still on the buttons — [semantics] above carries them —
+        // so nothing is lost to a reader who cannot see which glyph is which.
         if (count.isNotEmpty()) {
             Text(count, style = footLabelStyle(), modifier = Modifier.padding(start = Spacing.xs))
-        } else if (label == Res.string.post_reply_action || label == Res.string.post_quote_action || label == Res.string.post_edit_action) {
-            Text(description, style = footLabelStyle(), modifier = Modifier.padding(start = 4.dp))
         }
     }
 }

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
@@ -32,7 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -45,59 +41,31 @@ import io.github.nodyssey.ui.resources.page_jump_latest
 import io.github.nodyssey.ui.resources.page_jump_resume_title
 import io.github.nodyssey.ui.resources.post_floor_entry
 import io.github.nodyssey.ui.resources.post_floor_jump
-import io.github.nodyssey.ui.resources.post_floor_position
 import io.github.nodyssey.ui.resources.post_floor_range
 import io.github.nodyssey.ui.resources.post_open_original
-import io.github.nodyssey.ui.resources.post_reading_original
-import io.github.nodyssey.ui.resources.post_reading_original_position
 import io.github.nodyssey.ui.resources.post_reply_action
 import io.github.plaza.designsys.component.PlazaIcons
 import io.github.plaza.designsys.theme.LocalEinkMode
-import io.github.plaza.designsys.theme.LocalPlazaLayers
-import io.github.plaza.designsys.theme.TABULAR_FIGURES
 import org.jetbrains.compose.resources.stringResource
 
-/** The position and reply share a fixed row; scrolling never moves either control. */
+/**
+ * The reply button, alone and centred, for the reader already inside the thread.
+ *
+ * The pill that used to sit here showed 主帖 at the top and the floor number after it, and opened the
+ * 跳楼 panel. Both moved out: the panel is on the thread's own menu now, and the floor the reader is
+ * on is already on the scrollbar at the right edge, where it moves with the thumb rather than
+ * standing still in the middle of the page.
+ */
 @Composable
 internal fun ThreadReadingControls(
-    currentFloor: Int,
-    lastFloor: Int?,
-    onJump: () -> Unit,
     onReply: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val layers = LocalPlazaLayers.current
     val einkMode = LocalEinkMode.current
-    val positionLabel = if (currentFloor == 0) {
-        stringResource(Res.string.post_reading_original_position)
-    } else {
-        stringResource(Res.string.post_floor_position, currentFloor)
-    }
     Box(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp).heightIn(min = 48.dp)) {
-        Box(
-            Modifier.fillMaxWidth().padding(horizontal = 60.dp).align(Alignment.Center),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                onClick = onJump,
-                modifier = Modifier.widthIn(min = 104.dp).heightIn(min = 48.dp)
-                    .semantics { contentDescription = positionLabel },
-                shape = CircleShape,
-                color = layers.raised,
-                shadowElevation = if (einkMode) 0.dp else 2.dp,
-            ) {
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (currentFloor == 0) stringResource(Res.string.post_reading_original) else "$currentFloor / ${lastFloor ?: "…"}",
-                        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = TABULAR_FIGURES),
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
         FloatingActionButton(
             onClick = onReply,
-            modifier = Modifier.align(Alignment.CenterEnd).size(48.dp),
+            modifier = Modifier.align(Alignment.Center).size(48.dp),
             shape = RoundedCornerShape(16.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,

@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -137,14 +136,13 @@ class SearchScreenTest {
      * folded would take the search field off the screen with no gesture left that could return it.
      */
     @Test
-    fun `clearing the query brings the folded header back`() {
-        val clearQuery = setScreen(searchedState())
+    fun `the field stays put while the results scroll`() {
+        setScreen(searchedState())
 
         composeRule.onNode(resultList).performTouchInput { swipeUp() }
-        composeRule.onNodeWithContentDescription("高级搜索").assertIsNotDisplayed()
 
-        clearQuery()
-
+        // The field is at the foot of the screen now and never folds away with the results: it is
+        // the only way back to a different query, and it is where the keyboard already is.
         composeRule.onNodeWithContentDescription("高级搜索").assertIsDisplayed()
         composeRule.onNodeWithText("帖子").assertIsDisplayed()
     }

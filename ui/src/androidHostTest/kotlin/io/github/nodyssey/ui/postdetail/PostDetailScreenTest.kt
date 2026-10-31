@@ -79,6 +79,17 @@ class PostDetailScreenTest {
         isBlocked = blocked,
     )
 
+    /**
+     * 跳楼 moved off the reading pill and onto the thread's ⋮ menu.
+     *
+     * The pill at the foot of the thread used to carry the current floor and open this panel; the
+     * foot is the reply button alone now, and the floor is on the scrollbar at the right edge.
+     */
+    private fun openFloorJump() {
+        composeRule.onNodeWithContentDescription("更多").performClick()
+        composeRule.onNodeWithText("跳到楼层").performClick()
+    }
+
     private fun setScreen(
         state: PostDetailUiState,
         onRetry: () -> Unit = {},
@@ -154,7 +165,7 @@ class PostDetailScreenTest {
             onJumpToFloor = { requested += it },
             onReadingPositionChange = { page, floor -> position = page to floor },
         )
-        composeRule.onNodeWithContentDescription("正在读第 121 楼，点击跳楼").performClick()
+        openFloorJump()
         composeRule.onNode(hasSetTextAction()).performTextReplacement("127")
         composeRule.onNodeWithText("前往").performClick()
         composeRule.waitForIdle()
@@ -813,7 +824,7 @@ class PostDetailScreenTest {
     fun `a later-page read without a cached body can jump back to the opening post`() {
         var requested: String? = null
         setScreen(jumpedState(body = null), onJumpToFloor = { requested = it })
-        composeRule.onNodeWithContentDescription("正在读第 121 楼，点击跳楼").performClick()
+        openFloorJump()
         composeRule.onAllNodesWithText("查看正文")[1].performClick()
         assertEquals("#0", requested)
     }

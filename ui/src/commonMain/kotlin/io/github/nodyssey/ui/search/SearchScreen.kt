@@ -1,5 +1,6 @@
 package io.github.nodyssey.ui.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,12 +10,17 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -51,7 +57,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -94,7 +99,6 @@ import io.github.nodyssey.model.FeedSort
 import io.github.nodyssey.model.SearchHistoryEntry
 import io.github.nodyssey.model.SearchTarget
 import io.github.nodyssey.ui.common.BoardTag
-import io.github.nodyssey.ui.common.CollapsingHeader
 import io.github.nodyssey.ui.common.FeedSortOrder
 import io.github.nodyssey.ui.common.MediumButton
 import io.github.nodyssey.ui.common.NavigationBarScrollConnection
@@ -250,15 +254,6 @@ fun SearchScreen(
     var showOptionsSheet by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
-    /*
-     * The chrome above the results folds away as they scroll, which on a phone is the difference
-     * between five results and seven: the field, the tabs and the scope row cost ~170dp of an 800dp
-     * screen and none of them is being read while the reader is going down a list.
-     *
-     * The same `enterAlways` the home feed's title bar uses, so a short drag back up returns the lot.
-     */
-    val headerScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
     // The bar at the bottom answers the same gesture, through the same connection the feed uses, so
     // the two screens hide it on the same 16dp of committed direction.
     val directionThresholdPx = with(LocalDensity.current) { NavigationDirectionThreshold.toPx() }
@@ -283,8 +278,6 @@ fun SearchScreen(
      * the screen with no gesture left that could bring it back.
      */
     LaunchedEffect(state.submittedQuery, state.target, state.selectedBoard, state.sort) {
-        headerScrollBehavior.state.heightOffset = 0f
-        headerScrollBehavior.state.contentOffset = 0f
         navigationBarScrollConnection.reveal()
     }
 
@@ -301,11 +294,24 @@ fun SearchScreen(
             null
         }
 
-    Scaffold(modifier = modifier) { padding ->
-        Column(
-            modifier = Modifier.padding(padding).fillMaxSize().readableWidth(),
-        ) {
-            CollapsingHeader(headerScrollBehavior) {
+    Scaffold(
+        modifier = modifier,
+        /*
+         * The field and the 帖子 / 用户 switch sit at the foot of the screen now, where the keyboard
+         * is: typing happens at the bottom, and a field at the top had the keyboard covering the
+         * history and half the results it was about to search.
+         *
+         * The inset is ime-or-navigation-bars rather than both: with the keyboard up the ime inset
+         * already includes the strip the gesture bar sits in, and adding them would float the field
+         * a bar's height above the keys.
+         */
+        bottomBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                    .background(LocalPlazaLayers.current.page),
+            ) {
                 SearchInputRow(
                     queryState = queryState,
                     placeholder = searchPlaceholder(state),
@@ -333,23 +339,26 @@ fun SearchScreen(
                 } else {
                     ResultTabs(state = state, currentPage = resultPager.currentPage, onTargetChange = onTargetChange)
                 }
-
-                // Part of the header rather than of the results, because it is chrome for them: the
-                // board and the order the list on screen was fetched with.
-                if (state.submittedQuery != null && state.target == SearchTarget.POSTS) {
-                    ResultScopeRow(
-                        state = state,
-                        onOpenOptions = { showOptionsSheet = true },
-                        onBoardChange = onBoardChange,
-                        onSortChange = onSortChange,
-                    )
-                }
+            }
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.padding(padding).fillMaxSize().readableWidth(),
+        ) {
+            // The board and the order the rows on screen were fetched with: chrome for the results,
+            // and the only thing left above them.
+            if (state.submittedQuery != null && state.target == SearchTarget.POSTS) {
+                ResultScopeRow(
+                    state = state,
+                    onOpenOptions = { showOptionsSheet = true },
+                    onBoardChange = onBoardChange,
+                    onSortChange = onSortChange,
+                )
             }
 
             if (resultPager == null) {
-                // No connection here on purpose. The setup screen is where a query is written, and
-                // the field it is written in must not be scrollable off the top by the history list
-                // sitting under it.
+                // The setup screen is where a query is written, and the history list under it is
+                // what a reader picks from next — the field is pinned to the bottom either way.
                 SearchHistory(
                     searches = state.searchHistory.filter { it.target == state.target },
                     boards = state.boards,
@@ -359,16 +368,10 @@ fun SearchScreen(
                 )
             } else {
                 // On the wrapper rather than on each list: posts and users are two different
-                // composables with a list each, and nested scroll reaches this from either.
-                //
-                // The direction detector goes outside the header's connection for the same reason it
-                // does on the feed — nested inside, the header would eat the first ~180dp of every
-                // downward scroll and the bar below would only start hiding once it had finished.
-                Box(
-                    Modifier
-                        .nestedScroll(navigationBarScrollConnection)
-                        .nestedScroll(headerScrollBehavior.nestedScrollConnection),
-                ) {
+                // composables with a list each, and nested scroll reaches this from either. Only the
+                // navigation bar follows the scroll now — the header it used to share the gesture
+                // with is at the bottom of the screen and never folds.
+                Box(Modifier.nestedScroll(navigationBarScrollConnection)) {
                     TabPager(
                         state = resultPager,
                         key = { TargetOrder[it].name },

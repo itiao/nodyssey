@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -376,7 +377,10 @@ class PostDetailScreenRenderTest {
 
     private fun pageJump(darkTheme: Boolean) {
         composeRule.setContent { Screen(darkTheme = darkTheme) }
-        composeRule.onNodeWithContentDescription("正在读主帖，点击跳楼").performClick()
+        // 跳楼 moved off the reading pill and onto the thread's menu when the pill was removed.
+        composeRule.onNodeWithContentDescription("更多").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("跳到楼层").performClick()
         composeRule.waitForIdle()
 
         captureWindows("post-detail-jump-${if (darkTheme) "dark" else "light"}")
