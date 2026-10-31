@@ -1322,7 +1322,6 @@ private fun ThreadList(
                     // 0楼 draws the same six glyphs as a reply, so it needs the two actions too:
                     // 引用 quotes #0, 回复 opens the thread editor.
                     onQuote = { body?.toFloorReference()?.let(onQuoteFloor) ?: Unit },
-                    onReply = { onReplyToFloor(null) },
                     onOpenBrowser = onOpenBrowser,
                     onImageClick = onImageClick,
                     onJumpToFloor = onJumpToFloor,
@@ -1353,7 +1352,6 @@ private fun ThreadList(
                     replyStyle = state.postReplyStyle,
                     showBlockedContent = state.showBlockedContent,
                     onQuote = { body?.toFloorReference()?.let(onQuoteFloor) ?: Unit },
-                    onReply = { onReplyToFloor(null) },
                     onOpenBrowser = onOpenBrowser,
                     onImageClick = onImageClick,
                     onJumpToFloor = onJumpToFloor,
@@ -1733,8 +1731,6 @@ private fun ThreadOpeningPost(
     showBlockedContent: Boolean,
     /** 引用 of #0 — the opening post's own reference. */
     onQuote: () -> Unit,
-    /** 回复 of the thread, which is what replying to the opening post means. */
-    onReply: () -> Unit,
     onOpenBrowser: (String) -> Unit,
     onImageClick: (String) -> Unit,
     onJumpToFloor: (String) -> Unit,
@@ -1874,7 +1870,6 @@ private fun ThreadOpeningPost(
                 pending = pendingReaction,
                 onReact = onReact,
                 onQuote = onQuote,
-                onReply = onReply,
                 onMore = onMore,
                 modifier = Modifier.floorLongPress(longPress),
             )
@@ -1895,7 +1890,6 @@ private fun OriginalOpeningPost(
     onOpenOriginalPost: (() -> Unit)?,
     body: PostContent?,
     onQuote: () -> Unit,
-    onReply: () -> Unit,
     preview: ThreadPreview?,
     postId: Long,
     authorLevel: Int?,
@@ -2026,7 +2020,6 @@ private fun OriginalOpeningPost(
             pending = pendingReaction,
             onReact = onReact,
             onQuote = onQuote,
-            onReply = onReply,
             onMore = onMore,
             modifier = Modifier.floorLongPress(longPress),
         )
@@ -2560,7 +2553,6 @@ private fun OpeningPostActions(
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
     onQuote: () -> Unit,
-    onReply: () -> Unit,
     onMore: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -2568,13 +2560,16 @@ private fun OpeningPostActions(
         reactions = reactions,
         pending = pending,
         onReact = onReact,
-        onReply = onReply,
+        // No 回复 on the opening post: the site offers none, and the thread's reply button at the
+        // foot of the page is what replying to it means.
+        onReply = null,
         onQuote = onQuote,
         onEdit = null,
         onMore = onMore ?: {},
         modifier = modifier,
         compact = true,
         showCollect = true,
+        showMore = true,
     )
 }
 
@@ -2589,7 +2584,6 @@ private fun OriginalOpeningActions(
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
     onQuote: () -> Unit,
-    onReply: () -> Unit,
     onMore: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -2598,13 +2592,14 @@ private fun OriginalOpeningActions(
             reactions = reactions,
             pending = pending,
             onReact = onReact,
-            onReply = onReply,
+            onReply = null,
             onQuote = onQuote,
             onEdit = null,
             onMore = onMore ?: {},
             modifier = modifier,
             compact = true,
             showCollect = true,
+            showMore = true,
         )
     }
 }
@@ -2730,6 +2725,8 @@ private fun FloorFoot(
     compact: Boolean = false,
     /** 收藏 belongs to the thread, so only the opening post draws it. See [ThreadCollect]. */
     showCollect: Boolean = false,
+    /** The ⋯ that opens the floor panel. Only the opening post keeps one; see [FloorFoot]'s note. */
+    showMore: Boolean = false,
 ) {
     val collect = LocalThreadCollect.current?.takeIf { showCollect }
     Row(
@@ -2753,7 +2750,7 @@ private fun FloorFoot(
         }
         if (collect != null) {
             FloorActionButton(
-                icon = if (collect.collected) Icons.Filled.Star else Icons.Outlined.Star,
+                icon = if (collect.collected) Icons.Filled.Star else PlazaIcons.StarOutline,
                 label = if (collect.collected) Res.string.post_collected_action else Res.string.post_collect_action,
                 count = collect.count?.takeIf { it > 0 }?.toString().orEmpty(),
                 selected = collect.collected,
@@ -2769,13 +2766,15 @@ private fun FloorFoot(
             onEdit != null -> FloorActionButton(Icons.Default.Edit, Res.string.post_edit_action, onClick = onEdit, compact = compact)
             onReply != null -> FloorActionButton(PlazaIcons.Reply, Res.string.post_reply_action, onClick = onReply, compact = compact)
         }
-        // No ⋯: the row is glyphs only now, and the panel it opened — 复制正文, 举报, the priced
-        // marks — is still a long press on the floor. See [floorLongPress].
+        // The opening post keeps its ⋯: it is the row a reader reaches for 复制标题 and 举报 from, and
+        // it is the one row with the width to spare. Every other floor reaches the same panel by
+        // long press — see [floorLongPress].
+        if (showMore) FloorMoreButton(onMore, compact = compact)
     }
 }
 
 /** The gap between two glyphs on a floor's foot — one value, so every floor's row is the same rhythm. */
-private val FootGap = 2.dp
+private val FootGap = 0.dp
 
 /** The same explicit entry to all floor actions remains available beside the quick actions. */
 @Composable
@@ -2811,10 +2810,12 @@ private fun FloorActionButton(
             disabledContainerColor = container,
             disabledContentColor = if (accented || pending) content else content.copy(alpha = 0.45f),
         ),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+        contentPadding = PaddingValues(horizontal = if (compact) 2.dp else 6.dp, vertical = 0.dp),
         modifier = Modifier
-            .height(if (compact) 30.dp else 44.dp)
-            .widthIn(min = if (compact) 30.dp else 44.dp)
+            .height(if (compact) 28.dp else 44.dp)
+            // 24dp rather than 30: an icon-only mark is a 16dp glyph, and the old floor left 7dp of
+            // air on each side of it — six of them added up to a row that read as spaced out.
+            .widthIn(min = if (compact) 24.dp else 44.dp)
             .semantics { contentDescription = description },
     ) {
         if (pending) {
@@ -2852,7 +2853,7 @@ private fun FloorActionButton(
         // glyph already says. The names are still on the buttons — [semantics] above carries them —
         // so nothing is lost to a reader who cannot see which glyph is which.
         if (count.isNotEmpty()) {
-            Text(count, style = footLabelStyle(), modifier = Modifier.padding(start = Spacing.xs))
+            Text(count, style = footLabelStyle(), modifier = Modifier.padding(start = 2.dp))
         }
     }
 }

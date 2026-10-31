@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 import io.github.plaza.designsys.component.materialIcon
+import io.github.plaza.designsys.component.materialOutlineIcon
 
 /**
  * Icons that only mean something on NodeSeek.
@@ -19,7 +20,7 @@ import io.github.plaza.designsys.component.materialIcon
 object NodeSeekIcons {
     /** 鸡腿, the reward NodeSeek pays for a post. No core symbol comes close. */
     val ChickenLeg: ImageVector by lazy {
-        materialIcon(
+        materialOutlineIcon(
             name = "ChickenLeg",
             pathData =
             "M14.5,3.2c-2.7,-1.4 -6.3,-0.2 -8.2,2.5c-2,2.9 -1.7,6.3 0.6,8.1" +

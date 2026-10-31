@@ -2,6 +2,8 @@ package io.github.plaza.designsys.component
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
@@ -111,7 +113,7 @@ object PlazaIcons {
 
     /** Reply action used by the detail screen's sole primary FAB. */
     val Reply: ImageVector by lazy {
-        materialIcon(
+        materialOutlineIcon(
             name = "Reply",
             pathData =
             "M10,9V5L3,12l7,7v-4.1c5,0 8.5,1.6 11,5.1-1,-5-4,-11-11,-11z",
@@ -341,8 +343,22 @@ object PlazaIcons {
         )
     }
 
+    /**
+     * 收藏, hollow. Material's `Outlined.Star` is the filled star again — the hollow one is
+     * `StarBorder`, which this project's icon set does not carry — so the outline is stroked here
+     * from the same path, and the row keeps one weight.
+     */
+    val StarOutline: ImageVector by lazy {
+        materialOutlineIcon(
+            name = "StarOutline",
+            pathData =
+            "M12,17.27L18.18,21l-1.64,-7.03L22,9.24l-7.19,-0.61L12,2 9.19,8.63 2,9.24l5.46,4.73" +
+                "L5.82,21z",
+        )
+    }
+
     val ThumbDown: ImageVector by lazy {
-        materialIcon(
+        materialOutlineIcon(
             name = "ThumbDown",
             pathData =
             "M15,3H6c-0.8,0 -1.5,0.5 -1.8,1.2L1.1,11.3C0.6,12.6 1.5,14 3,14h5.7" +
@@ -472,7 +488,7 @@ object PlazaIcons {
     }
 
     val FormatQuote: ImageVector by lazy {
-        materialIcon(
+        materialOutlineIcon(
             name = "FormatQuote",
             pathData = "M6,17h3l2,-4V7H5v6h3zM14,17h3l2,-4V7h-6v6h3z",
         )
@@ -1048,4 +1064,32 @@ fun materialIcon(
             pathData = addPathNodes(pathData),
             // Black is a placeholder: `Icon` tints the whole vector, so the fill never survives.
             fill = SolidColor(Color.Black),
+        ).build()
+
+/**
+ * The same 24dp glyph drawn as a line rather than a silhouette.
+ *
+ * Stroking the filled path's own contour is the cheapest hollow version of a symbol this codebase
+ * already carries: the line lands exactly where the shape's edge was, so a row of marks keeps one
+ * weight without four of them being redrawn by hand.
+ */
+fun materialOutlineIcon(
+    name: String,
+    pathData: String,
+    strokeWidth: Float = 1.7f,
+): ImageVector =
+    ImageVector
+        .Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(
+            pathData = addPathNodes(pathData),
+            // Black is a placeholder: `Icon` tints the whole vector, stroke included.
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = strokeWidth,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
         ).build()
