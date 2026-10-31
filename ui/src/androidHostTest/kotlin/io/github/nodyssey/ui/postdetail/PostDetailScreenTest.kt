@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -85,6 +86,13 @@ class PostDetailScreenTest {
      * The pill at the foot of the thread used to carry the current floor and open this panel; the
      * foot is the reply button alone now, and the floor is on the scrollbar at the right edge.
      */
+    // The floor action panel, which every foot reaches by long press now that no row carries a ⋯.
+    // The first floor on screen answers; the panel is the same for all of them.
+    private fun openFloorPanel() {
+        composeRule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)).onFirst()
+            .performSemanticsAction(SemanticsActions.OnLongClick)
+    }
+
     private fun openFloorJump() {
         composeRule.onNodeWithContentDescription("更多").performClick()
         composeRule.onNodeWithText("跳到楼层").performClick()
@@ -146,7 +154,7 @@ class PostDetailScreenTest {
         clipboard.setPrimaryClip(ClipData.newPlainText("previous", "previous clipboard value"))
         setScreen(PostDetailUiState(title = title, body = content("a different body")))
 
-        composeRule.onNodeWithContentDescription("楼层操作").performClick()
+        openFloorPanel()
         composeRule.onNodeWithText("选择并复制标题").performClick()
         composeRule.onNodeWithText("复制全部").performClick()
         composeRule.waitForIdle()
@@ -838,7 +846,7 @@ class PostDetailScreenTest {
             onReact = { _, action -> sent += action },
         )
 
-        composeRule.onNodeWithContentDescription("楼层操作").performClick()
+        openFloorPanel()
         composeRule.onNodeWithText("已表态").assertIsDisplayed()
         composeRule.onNodeWithText("点踩").performClick()
 

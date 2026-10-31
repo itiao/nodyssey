@@ -2,9 +2,10 @@ package io.github.nodyssey.render
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -368,9 +369,9 @@ class PostDetailScreenRenderTest {
 
     private fun floorPanel(darkTheme: Boolean) {
         composeRule.setContent { Screen(darkTheme = darkTheme) }
-        // The reply foot carries six glyphs and no ⋯ now, so the panel opens the way the row says
-        // it does: a long press on the floor.
-        composeRule.onAllNodesWithContentDescription("楼层操作")[0].performSemanticsAction(SemanticsActions.OnClick)
+        // No ⋯ on any foot any more, so the panel opens the way the row says it does: a long press.
+        composeRule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)).onFirst()
+            .performSemanticsAction(SemanticsActions.OnLongClick)
         composeRule.waitForIdle()
 
         captureWindows("post-detail-actions-${if (darkTheme) "dark" else "light"}")

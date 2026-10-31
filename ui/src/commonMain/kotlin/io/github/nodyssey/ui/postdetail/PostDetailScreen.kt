@@ -193,7 +193,6 @@ import io.github.nodyssey.ui.resources.post_quote_floor
 import io.github.nodyssey.ui.resources.post_reaction_chicken
 import io.github.nodyssey.ui.resources.post_reaction_cost
 import io.github.nodyssey.ui.resources.post_reaction_dislike
-import io.github.nodyssey.ui.resources.post_reaction_feed
 import io.github.nodyssey.ui.resources.post_reaction_free
 import io.github.nodyssey.ui.resources.post_reaction_free_today
 import io.github.nodyssey.ui.resources.post_reaction_irreversible
@@ -835,7 +834,11 @@ fun PostDetailScreen(
                                 // 收藏 is the thread's, so every floor's foot reads it from here.
                                 LocalThreadCollect provides
                                     state.collected?.let { collected ->
-                                        ThreadCollect(collected) { if (state.isSignedIn) onCollect() else onSignIn() }
+                                        ThreadCollect(
+                                            collected = collected,
+                                            count = state.collectionCount,
+                                            pending = state.collectPending,
+                                        ) { if (state.isSignedIn) onCollect() else onSignIn() }
                                     },
                             ) {
                                 ThreadList(
@@ -1316,6 +1319,10 @@ private fun ThreadList(
                     authorJoinedDays = state.authorJoinedDays,
                     showAuthorAccountInfo = state.showAuthorAccountInfo,
                     showBlockedContent = state.showBlockedContent,
+                    // 0楼 draws the same six glyphs as a reply, so it needs the two actions too:
+                    // 引用 quotes #0, 回复 opens the thread editor.
+                    onQuote = { body?.toFloorReference()?.let(onQuoteFloor) ?: Unit },
+                    onReply = { onReplyToFloor(null) },
                     onOpenBrowser = onOpenBrowser,
                     onImageClick = onImageClick,
                     onJumpToFloor = onJumpToFloor,
@@ -1345,6 +1352,8 @@ private fun ThreadList(
                     showAuthorAccountInfo = state.showAuthorAccountInfo,
                     replyStyle = state.postReplyStyle,
                     showBlockedContent = state.showBlockedContent,
+                    onQuote = { body?.toFloorReference()?.let(onQuoteFloor) ?: Unit },
+                    onReply = { onReplyToFloor(null) },
                     onOpenBrowser = onOpenBrowser,
                     onImageClick = onImageClick,
                     onJumpToFloor = onJumpToFloor,
@@ -1722,6 +1731,10 @@ private fun ThreadOpeningPost(
     authorLevel: Int?,
     authorJoinedDays: Int?,
     showBlockedContent: Boolean,
+    /** 引用 of #0 — the opening post's own reference. */
+    onQuote: () -> Unit,
+    /** 回复 of the thread, which is what replying to the opening post means. */
+    onReply: () -> Unit,
     onOpenBrowser: (String) -> Unit,
     onImageClick: (String) -> Unit,
     onJumpToFloor: (String) -> Unit,
@@ -1860,10 +1873,8 @@ private fun ThreadOpeningPost(
                 reactions = body.reactions,
                 pending = pendingReaction,
                 onReact = onReact,
-                collected = collected,
-                collectionCount = collectionCount,
-                collectPending = collectPending,
-                onCollect = onCollect,
+                onQuote = onQuote,
+                onReply = onReply,
                 onMore = onMore,
                 modifier = Modifier.floorLongPress(longPress),
             )
@@ -1883,6 +1894,8 @@ private fun OriginalOpeningPost(
     isAwarded: Boolean,
     onOpenOriginalPost: (() -> Unit)?,
     body: PostContent?,
+    onQuote: () -> Unit,
+    onReply: () -> Unit,
     preview: ThreadPreview?,
     postId: Long,
     authorLevel: Int?,
@@ -2012,10 +2025,8 @@ private fun OriginalOpeningPost(
             reactions = body.reactions,
             pending = pendingReaction,
             onReact = onReact,
-            collected = collected,
-            collectionCount = collectionCount,
-            collectPending = collectPending,
-            onCollect = onCollect,
+            onQuote = onQuote,
+            onReply = onReply,
             onMore = onMore,
             modifier = Modifier.floorLongPress(longPress),
         )
@@ -2538,47 +2549,38 @@ private fun Modifier.floorLongPressSemantics(onLongPress: (() -> Unit)?): Modifi
     }
 }
 
-/** Thread actions share the replies' quiet, trailing pills. Unknown collection state stays absent. */
+/**
+ * The opening post's foot: the same six glyphs every floor draws, with 收藏 — the one mark that is
+ * the thread's rather than the floor's, and so is drawn under the opening post alone.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OpeningPostActions(
     reactions: PostReactions?,
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
-    collected: Boolean?,
-    collectionCount: Int?,
-    collectPending: Boolean,
-    onCollect: () -> Unit,
+    onQuote: () -> Unit,
+    onReply: () -> Unit,
     onMore: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.End),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        itemVerticalAlignment = Alignment.CenterVertically,
-    ) {
-        listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg, ReactionAction.Dislike).forEach { action ->
-            ReactionPill(action, reactions, pending, onReact)
-        }
-        if (collected != null) {
-            FloorActionButton(
-                icon = if (collected) Icons.Filled.Star else Icons.Outlined.Star,
-                label = if (collected) Res.string.post_collected_action else Res.string.post_collect_action,
-                count = collectionCount?.takeIf { it > 0 }?.toString().orEmpty(),
-                selected = collected,
-                pending = collectPending,
-                onClick = onCollect.takeUnless { collectPending },
-            )
-        }
-        if (onMore != null) FloorMoreButton(onMore)
-    }
+    FloorFoot(
+        reactions = reactions,
+        pending = pending,
+        onReact = onReact,
+        onReply = onReply,
+        onQuote = onQuote,
+        onEdit = null,
+        onMore = onMore ?: {},
+        modifier = modifier,
+        compact = true,
+        showCollect = true,
+    )
 }
 
 /**
- * The official opening post's action row: 点赞 and 投喂 as tonal pills with their tallies, then the
- * bookmark and ⋯ against the far edge. The 1.3.4 row draws the same actions as quiet buttons; the
- * pills are what the pre-fork build put under the opening post, so 原版 keeps them.
+ * The official opening post's action row: the same six glyphs as every floor's, with 收藏 included
+ * because the opening post is the floor 收藏 belongs to.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -2586,55 +2588,24 @@ private fun OriginalOpeningActions(
     reactions: PostReactions?,
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
-    collected: Boolean?,
-    collectionCount: Int?,
-    collectPending: Boolean,
-    onCollect: () -> Unit,
+    onQuote: () -> Unit,
+    onReply: () -> Unit,
     onMore: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-        FlowRow(
-            modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            listOf(ReactionAction.Upvote, ReactionAction.ChickenLeg, ReactionAction.Dislike).forEach { action ->
-                val count = reactions?.countOf(action)?.toString()
-                val text =
-                    if (action == ReactionAction.ChickenLeg) {
-                        listOfNotNull(stringResource(Res.string.post_reaction_feed), count).joinToString(" ")
-                    } else {
-                        count.orEmpty()
-                    }
-                OriginalReactionPill(
-                    action = action,
-                    text = text,
-                    spent = reactions?.hasSpent(action) == true,
-                    pending = pending == action,
-                    onClick = if (reactions != null && pending == null) ({ onReact(action) }) else null,
-                )
-            }
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (collected != null) {
-                    FloorActionButton(
-                        icon = if (collected) Icons.Filled.Star else Icons.Outlined.Star,
-                        label = if (collected) Res.string.post_collected_action else Res.string.post_collect_action,
-                        count = collectionCount?.toString().orEmpty(),
-                        selected = collected,
-                        pending = collectPending,
-                        onClick = onCollect.takeUnless { collectPending },
-                        compact = true,
-                    )
-                }
-                if (onMore != null) FloorMoreButton(onMore, compact = true)
-            }
-        }
+        FloorFoot(
+            reactions = reactions,
+            pending = pending,
+            onReact = onReact,
+            onReply = onReply,
+            onQuote = onQuote,
+            onEdit = null,
+            onMore = onMore ?: {},
+            modifier = modifier,
+            compact = true,
+            showCollect = true,
+        )
     }
 }
 
@@ -2728,9 +2699,11 @@ private fun CommentFoot(
         onEdit = onEdit,
         onMore = onMore,
         modifier = modifier,
-        // The site's own foot is a dense row of glyphs; six marks plus 引用/回复/⋯ at 44dp each is
+        // The site's own foot is a dense row of glyphs; five marks plus 引用/回复 at 44dp each is
         // wider than a phone, and this is the row the reader taps rather than reads.
         compact = true,
+        // 收藏 is the thread's, and the site draws it under the opening post alone.
+        showCollect = false,
     )
 }
 
@@ -2755,13 +2728,15 @@ private fun FloorFoot(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    /** 收藏 belongs to the thread, so only the opening post draws it. See [ThreadCollect]. */
+    showCollect: Boolean = false,
 ) {
-    val collect = LocalThreadCollect.current
-    // A Row, not a FlowRow: the two groups are pinned to opposite ends by a weighted spacer, and a
-    // FlowRow has no such spacer — the weight ate the line and wrapped 回复 onto a second one.
+    val collect = LocalThreadCollect.current?.takeIf { showCollect }
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        // One right-aligned run of glyphs with the same 2dp between every pair: the row used to be
+        // two groups pinned to opposite ends, which read as two different toolbars.
+        horizontalArrangement = Arrangement.spacedBy(FootGap, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 点赞 / 鸡腿 / 反对 — the three marks, in the enum's order, which is the site's.
@@ -2780,12 +2755,13 @@ private fun FloorFoot(
             FloorActionButton(
                 icon = if (collect.collected) Icons.Filled.Star else Icons.Outlined.Star,
                 label = if (collect.collected) Res.string.post_collected_action else Res.string.post_collect_action,
+                count = collect.count?.takeIf { it > 0 }?.toString().orEmpty(),
                 selected = collect.collected,
-                onClick = collect.onCollect,
+                pending = collect.pending,
+                onClick = collect.onCollect.takeUnless { collect.pending },
                 compact = compact,
             )
         }
-        Spacer(Modifier.weight(1f))
         if (onQuote != null) {
             FloorActionButton(PlazaIcons.FormatQuote, Res.string.post_quote_action, onClick = onQuote, compact = compact)
         }
@@ -2793,11 +2769,13 @@ private fun FloorFoot(
             onEdit != null -> FloorActionButton(Icons.Default.Edit, Res.string.post_edit_action, onClick = onEdit, compact = compact)
             onReply != null -> FloorActionButton(PlazaIcons.Reply, Res.string.post_reply_action, onClick = onReply, compact = compact)
         }
-        // No ⋯ here: six glyphs and the badge is all a phone's width holds, and the panel it opened
-        // — 复制正文, 举报, the priced marks — is still a long press on the floor, which is where the
-        // row already says to look. See [floorLongPress].
+        // No ⋯: the row is glyphs only now, and the panel it opened — 复制正文, 举报, the priced
+        // marks — is still a long press on the floor. See [floorLongPress].
     }
 }
+
+/** The gap between two glyphs on a floor's foot — one value, so every floor's row is the same rhythm. */
+private val FootGap = 2.dp
 
 /** The same explicit entry to all floor actions remains available beside the quick actions. */
 @Composable
@@ -2983,7 +2961,13 @@ private fun ReactionConfirmDialog(
  * ThreadList → CommentRow → CommentFoot would have added two arguments to three signatures to say
  * the one thing. Null while the state does not know yet, or for a reader who cannot collect.
  */
-private data class ThreadCollect(val collected: Boolean, val onCollect: () -> Unit)
+private data class ThreadCollect(
+    val collected: Boolean,
+    /** How many readers have collected it; the opening post is the only row that draws it. */
+    val count: Int?,
+    val pending: Boolean,
+    val onCollect: () -> Unit,
+)
 
 private val LocalThreadCollect = compositionLocalOf<ThreadCollect?> { null }
 
