@@ -27,6 +27,8 @@ internal val Context.settingsDataStore: DataStore<Preferences> by preferencesDat
     name = "settings",
 )
 
+internal val Context.accountsDataStore: DataStore<Preferences> by preferencesDataStore(name = "accounts")
+
 internal val Context.proxyDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "proxy",
 )
@@ -99,6 +101,8 @@ internal val Context.imageHostDataStore: DataStore<Preferences> by preferencesDa
         )
     },
 )
+
+internal val Context.mailDataStore: DataStore<Preferences> by preferencesDataStore(name = "seek-mail")
 
 /**
  * Where the NodeImage key lived when nodeimage.com was the only host the app could talk to.

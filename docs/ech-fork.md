@@ -16,7 +16,7 @@
 
 从 `1.2.22-ech.7` 起，内置预设使用新的 resolver 域名，避开原域名在部分直连网络上的 TLS 重置。已选择此预设的用户升级后自动使用新入口，自定义 DoH 地址保持原设置。
 
-首次启用加密 DNS 时默认选择此服务。覆盖安装会保留已保存的开关、服务器选择和排序，新服务补入列表后不自动改动选择。
+未保存过加密 DNS 开关时，默认启用此服务。服务针对 NodeSeek 网站提供专属解析优化，结合优选 Cloudflare 地址与 ECH 配置改善访问体验。覆盖安装会保留已保存的开关、服务器选择和排序，新服务补入列表后不自动改动选择。
 
 服务基于 [edge-smart-doh](https://github.com/1molchuan/edge-smart-doh)，提供优选 Cloudflare 地址并补充 ECH 配置；还需要客户端支持 ECH，且目标地址在当前网络中可达。登录 WebView 使用独立的网络栈，不使用 App 的 DoH/ECH；Android 的网页登录、人机验证和登录弹窗会使用已保存的 App 内代理。无认证代理直接通过 AndroidX `ProxyController` 配置；带认证的 HTTP/SOCKS5 通过仅监听本机的 CONNECT 适配层转发，目标域名由代理解析，HTTPS 证书校验仍由 WebView 完成。关闭内置代理后恢复系统网络设置，外部浏览器不受影响。
 
@@ -28,9 +28,9 @@
 
 应用只从 `https://weishiair.github.io/nodyssey/` 的静态清单获取更新和更新日志，下载地址仅允许 `weishiair/nodyssey` 的 GitHub Release，下载后验证 SHA-256。
 
-升级到此功能的首版时，旧上游更新检查缓存会失效，避免继续提醒安装官方版。旧版 `1.2.22-ech.5` 等 ECH 修订版仍按数字比较；`1.3.0` 会正常替换旧正式版及测试版。正式版 `1.3.6` 使用 Android versionCode 113，先前测试构建已分配至 112；下一次测试使用 `1.3.7-test.1`（114）。后续测试递增 `test.N` 和 versionCode，正式版使用 `1.3.6` 这样的格式；旧 `-dev.N` 版本继续兼容。
+升级到此功能的首版时，旧上游更新检查缓存会失效，避免继续提醒安装官方版。旧版 `1.2.22-ech.5` 等 ECH 修订版仍按数字比较；`1.3.0` 会正常替换旧正式版及测试版。正式版 `1.3.8` 使用 Android versionCode 127，`1.3.9` 系列 Android／iOS 测试构建已使用至 133，正式版 `1.3.9` 使用 134；下一次测试使用 `1.3.10-test.1`（135）。后续测试递增 `test.N` 和 versionCode，正式版使用 `1.3.9` 这样的格式；旧 `-dev.N` 版本继续兼容。
 
-新版本发布包含签名 APK 的 `v1.3.6` GitHub Release，APK 使用 `nodyssey-v1.3.6.apk` 格式。发布工作流兼容新命名和旧 `ech-*` 历史，生成并发布本分支的 `updates` 清单；不读取上游 Release。GitHub Pages 使用 `updates` 分支根目录，需在仓库设置中保持启用。
+新版本发布包含签名 APK 的 `v1.3.9` GitHub Release，APK 使用 `nodyssey-v1.3.9.apk` 格式。发布工作流兼容新命名和旧 `ech-*` 历史，生成并发布本分支的 `updates` 清单；不读取上游 Release。GitHub Pages 使用 `updates` 分支根目录，需在仓库设置中保持启用。
 
 ## Android 打包约定
 
@@ -42,7 +42,7 @@
 
 签名通过 `NODYSSEY_KEYSTORE_FILE`、`NODYSSEY_KEYSTORE_PASSWORD`、`NODYSSEY_KEY_ALIAS`、`NODYSSEY_KEY_PASSWORD` 注入，沿用本分支既有证书和 `io.github.nodyssey.debug` 包名，以便覆盖安装并保留数据。缺少密钥时上述命令生成未签名包，不能作为可安装包交付，也不自动改成临时包名或其他签名。
 
-交付前用 SDK 的 `aapt2 dump badging` 与 `apksigner verify --print-certs` 核对版本号、versionCode、包名、ARM 架构、非调试状态和签名，再核对大小；文件名使用 `nodyssey-v1.3.7-test.1.apk` 这样的格式。构建后执行 `.\gradlew.bat --stop`。正式发布才创建 `v1.3.6`；测试发布创建 `v1.3.7-test.1` 并标为 prerelease。
+交付前用 SDK 的 `aapt2 dump badging` 与 `apksigner verify --print-certs` 核对版本号、versionCode、包名、ARM 架构、非调试状态和签名，再核对大小；文件名使用 `nodyssey-v1.3.9-test.1.apk` 这样的格式。构建后执行 `.\gradlew.bat --stop`。正式发布才创建 `v1.3.8`；测试发布创建 `v1.3.9-test.1` 并标为 prerelease。
 
 本机 Windows 签名库固定存放在用户目录的 `.nodyssey/signing/release.keystore`，与仓库、桌面临时文件分开。四个签名变量保存在当前 Windows 用户的环境中。已经运行的终端或 AI 进程需要先加载用户环境，再执行打包命令：
 
@@ -52,3 +52,11 @@
 ```
 
 既有发布证书 SHA-256 为 `71218866231eae5bf61a1192b2df0180d6d65d55e6aa08f0e52176dbcad197f8`。证书显示名称为 `Android Debug`，辨认时以指纹为准。签名库和密码应另外保存到受保护的备份位置，不能提交到 Git。
+
+## 已发布版本的 iOS 补包
+
+如果 Android 已发布而 iOS 构建需要补充修复，保留原发布标签，修复仍通过 PR 合入
+`dev` 和 `main`。手动运行 `Release` 工作流时，`tag` 填原标签，`ios_ref` 填修复提交；
+验证修复分支时可以从该分支手动运行，构建通过后再完成发布合并。
+Android 仍从原标签构建；iOS 来源的版本号、构建号必须与该标签一致，工作流会在构建前检查。
+IPA 的 `ios-build-<tag>.txt` 和 Release 说明记录实际 iOS 源码提交，便于对应二进制与源码。

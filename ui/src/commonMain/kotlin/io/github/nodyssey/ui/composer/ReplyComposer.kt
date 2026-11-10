@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
@@ -42,15 +43,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.nodyssey.data.composer.ImageAttachment
 import io.github.nodyssey.data.composer.PickedImage
 import io.github.nodyssey.data.composer.UploadFailure
@@ -288,22 +296,24 @@ private fun ReplyEditorSheet(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val stickerPictures = rememberStickerPictures()
+    // The link key's long press opens a popup menu, and a popup takes the window's focus with it.
+    // Asking for the field again on the way back is what keeps the keyboard and the caret where the
+    // writer left them — the post editor does the same.
+    val bodyFocus = remember { FocusRequester() }
 
-    ModalBottomSheet(
-        // Guarded like the close button and the BackHandler: while a publish is in flight, a swipe
-        // or scrim tap must not be the one dismiss path that still works.
-        onDismissRequest = { if (!state.isPublishing) onDismiss() },
-        sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-        ),
-        // A sheet of paper, like the post editor's page (2c): the editor is one card lifted over the
-        // thread, and only its bar and the emoji panel under it recede.
-        containerColor = LocalPlazaLayers.current.card,
-        shape = PlazaSheetDefaults.shape,
-        dragHandle = { PlazaSheetDefaults.DragHandle() },
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().imePadding()) {
+    // On a tablet the editor is a card in the middle of the window, the way Mail's reply is, rather
+    // than a phone's sheet rising from the bottom edge of one column under a scrim that greys out the
+    // whole window. Height counts as well as width: a phone on its side is wide, but a centred card
+    // over its keyboard would leave the editor a sliver.
+    val windowSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    val asCard =
+        with(density) {
+            windowSize.width.toDp() >= REPLY_CARD_MIN_WINDOW && windowSize.height.toDp() >= REPLY_CARD_MIN_WINDOW
+        }
+    val dismiss = { if (!state.isPublishing) onDismiss() }
+    val editor: @Composable (Modifier) -> Unit = { editorModifier ->
+        Column(modifier = editorModifier.fillMaxWidth()) {
             // The post editor's top bar in miniature: ✕ · where the reply goes · 预览 · 发布. 发布
             // moved up here from the end of the formatting strip, which is what let the strip go —
             // it was the reason that strip had to squeeze its keys to 42dp.
@@ -388,6 +398,7 @@ private fun ReplyEditorSheet(
                 modifier = Modifier
                     .readableWidth()
                     .heightIn(min = MIN_EDITOR_HEIGHT, max = MAX_EDITOR_HEIGHT)
+                    .focusRequester(bodyFocus)
                     .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md, bottom = Spacing.sm),
             )
             AttachmentTray(
@@ -424,6 +435,7 @@ private fun ReplyEditorSheet(
                 editorState = editorState,
                 onPickImages = onPickImages,
                 onPickHostedImages = onPickHostedImages,
+                onFormatted = { bodyFocus.requestFocus() },
                 onCustomize = onCustomize,
                 appMenu = {
                     ComposerAppMenu(onInsertVote = onInsertVote, onInsertStardust = onInsertStardust)
@@ -438,6 +450,40 @@ private fun ReplyEditorSheet(
                 },
                 inlinePictures = stickerPictures,
             )
+        }
+    }
+    if (asCard) {
+        Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            // The keyboard pushes the card up rather than covering its bottom, where 发布's strip is.
+            Box(
+                modifier = Modifier.imePadding().padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = LocalPlazaLayers.current.card,
+                    modifier = Modifier.widthIn(max = REPLY_CARD_MAX_WIDTH).fillMaxWidth(),
+                ) {
+                    editor(Modifier.padding(top = Spacing.xs))
+                }
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            // Guarded like the close button and the BackHandler: while a publish is in flight, a swipe
+            // or scrim tap must not be the one dismiss path that still works.
+            onDismissRequest = dismiss,
+            sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            ),
+            // A sheet of paper, like the post editor's page (2c): the editor is one card lifted over the
+            // thread, and only its bar and the emoji panel under it recede.
+            containerColor = LocalPlazaLayers.current.card,
+            shape = PlazaSheetDefaults.shape,
+            dragHandle = { PlazaSheetDefaults.DragHandle() },
+        ) {
+            editor(Modifier.imePadding())
         }
     }
 }
@@ -647,3 +693,9 @@ private fun formatTime(timestamp: Long): String = TimeFormat.clock(timestamp)
 private val MIN_EDITOR_HEIGHT = 80.dp
 private val MAX_EDITOR_HEIGHT = 260.dp
 private const val SLIDE_FRACTION = 6
+
+/** From here on, in both directions, the reply editor is a centred card rather than a bottom sheet. */
+private val REPLY_CARD_MIN_WINDOW = 600.dp
+
+/** The card's width at most: the readable column, so a line in the editor reads like one in a post. */
+private val REPLY_CARD_MAX_WIDTH = 640.dp

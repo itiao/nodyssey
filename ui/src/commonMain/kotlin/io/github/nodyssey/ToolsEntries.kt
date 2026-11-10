@@ -7,6 +7,12 @@ import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.ui.compare.ReportCompareRoute
 import io.github.nodyssey.ui.compare.ReportCompareViewModel
 import io.github.nodyssey.ui.login.WebViewGoal
+import io.github.nodyssey.ui.lottery.LotteryRoute
+import io.github.nodyssey.ui.lottery.LotteryViewModel
+import io.github.nodyssey.ui.mail.MailDetailRoute
+import io.github.nodyssey.ui.mail.MailDetailViewModel
+import io.github.nodyssey.ui.mail.MailInboxRoute
+import io.github.nodyssey.ui.mail.MailInboxViewModel
 import io.github.nodyssey.ui.tools.AwardRoute
 import io.github.nodyssey.ui.tools.AwardViewModel
 import io.github.nodyssey.ui.tools.CommunityToolsScreen
@@ -35,6 +41,32 @@ internal fun EntryProviderScope<NavKey>.toolsEntries(nav: StackEntryScope) = wit
             onRuling = { backStack.add(RulingKey) },
             onReportCompare = { backStack.add(ReportCompareKey) },
             onAboutCommunity = { backStack.add(AboutCommunityKey) },
+            onMail = { backStack.add(MailInboxKey) },
+        )
+    }
+
+    entry<MailInboxKey> { key ->
+        val viewModel: MailInboxViewModel = viewModel(factory = MailInboxViewModel.factory(container))
+        MailInboxRoute(
+            viewModel = viewModel,
+            onBack = { backStack.closeList(key) },
+            onOpenMail = { mail ->
+                backStack.openFromList(key, MailDetailKey(mail.mailboxId, mail.id), isListDetailExpanded())
+            },
+            onOpenWebsite = openExternalUrl,
+            session = container.sessionRepository,
+            userAgent = container.userAgent,
+        )
+    }
+
+    entry<MailDetailKey> { key ->
+        val viewModel: MailDetailViewModel = viewModel(
+            factory = MailDetailViewModel.factory(container, key.mailboxId, key.mailId),
+        )
+        MailDetailRoute(
+            viewModel = viewModel,
+            onBack = { backStack.removeLastOrNull() },
+            onOpenWebsite = openExternalUrl,
         )
     }
 
@@ -62,6 +94,18 @@ internal fun EntryProviderScope<NavKey>.toolsEntries(nav: StackEntryScope) = wit
                 backStack.add(WebKey(url, siteTitle, WebViewGoal.CHALLENGE))
             },
             onSignIn = { backStack.add(SignInKey) },
+        )
+    }
+
+    entry<LotteryKey> {
+        LotteryRoute(
+            viewModel = viewModel(factory = LotteryViewModel.factory(container)),
+            onBack = { backStack.removeLastOrNull() },
+            onOpenThread = { backStack.add(PostDetailKey(it)) },
+            onOpenBrowser = openWebUrl,
+            onSignIn = { backStack.add(SignInKey) },
+            onVerify = { backStack.add(WebKey(it, siteTitle, WebViewGoal.CHALLENGE)) },
+            onCreate = { backStack.add(LuckyKey) },
         )
     }
 

@@ -24,6 +24,9 @@ data object NotificationsKey : NavKey
 data object ProfileKey : NavKey
 
 @Serializable
+data object AccountsKey : NavKey
+
+@Serializable
 data object SettingsKey : NavKey
 
 /**
@@ -331,6 +334,13 @@ data object StardustKey : NavKey
 @Serializable
 data object CommunityToolsKey : NavKey
 
+@Serializable
+data object MailInboxKey : NavKey
+
+/** IDs only: neither credentials nor mail content belong in a saved back stack. */
+@Serializable
+data class MailDetailKey(val mailboxId: Long, val mailId: Long) : NavKey
+
 /**
  * 我的主题帖 (board n2) and 我的评论 (board n3).
  *
@@ -348,6 +358,9 @@ data object MyCommentsKey : NavKey
 
 @Serializable
 data object AwardKey : NavKey
+
+@Serializable
+data object LotteryKey : NavKey
 
 @Serializable
 data object LuckyKey : NavKey

@@ -21,6 +21,7 @@ import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.core.Site
 import io.github.nodyssey.core.net.AppWebViewProxy
 import io.github.nodyssey.core.net.BundledEch
+import io.github.nodyssey.data.attendance.AutoAttendanceWork
 import io.github.nodyssey.data.offline.AndroidOfflineFileStore
 import io.github.nodyssey.data.offline.OfflineDownloads
 import io.github.nodyssey.data.offline.OfflineImageInterceptor
@@ -38,10 +39,12 @@ import io.github.nodyssey.platform.CompatSvgParser
 import io.github.nodyssey.platform.hasValidatedUnmeteredNetwork
 import io.github.nodyssey.ui.settings.AndroidActiveSite
 import io.github.nodyssey.ui.settings.AndroidAppLanguage
+import io.github.plaza.core.runCatchingExceptCancellation
 import io.github.plaza.designsys.image.LongLivedImageCacheStrategy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -123,6 +126,9 @@ open class NodysseyApp :
         enableDebugStrictMode()
 
         NotificationChannels.ensure(this)
+        applicationScope.launch {
+            runCatchingExceptCancellation { container.lotteryRepository?.synchronize() }
+        }
         // 应用内更新 asks once per launch: the dot on 设置 and 我的 is there from the first frame, and a
         // release the user has not been told about raises the reminder dialog. Not forced, so the
         // stored answer covers most launches and GitHub is asked at most once every few hours; a
@@ -144,6 +150,15 @@ open class NodysseyApp :
         // exactly the case a check at screen-open misses. Scheduled unconditionally and cheap: the
         // sweep does nothing on a device that has downloaded nothing.
         OfflineWork.ensureMaintenance(this)
+        applicationScope.launch {
+            sites.state.collectLatest { state ->
+                checkNotNull(state.graph.automaticAttendance).enabled
+                    .distinctUntilChanged()
+                    .collect { enabled ->
+                        AutoAttendanceWork.sync(this@NodysseyApp, enabled)
+                    }
+            }
+        }
         // The scheduler follows the settings SSOT rather than being poked from the settings screen,
         // so the schedule is correct even when a setting changes without that screen ever opening.
         applicationScope.launch {

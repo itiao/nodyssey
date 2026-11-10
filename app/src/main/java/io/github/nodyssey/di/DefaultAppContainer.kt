@@ -1,6 +1,7 @@
 package io.github.nodyssey.di
 
 import android.content.Context
+import androidx.core.app.NotificationManagerCompat
 import coil3.SingletonImageLoader
 import io.github.nodyssey.core.ActiveSite
 import io.github.nodyssey.core.NodeSeekSite
@@ -26,12 +27,14 @@ import io.github.nodyssey.data.CommunityRepository
 import io.github.nodyssey.data.CreditRepository
 import io.github.nodyssey.data.DefaultAppCacheStore
 import io.github.nodyssey.data.FollowRepository
+import io.github.nodyssey.data.InviteRepository
 import io.github.nodyssey.data.MessageRepository
 import io.github.nodyssey.data.NetworkAssetsRepository
 import io.github.nodyssey.data.NetworkAwardRepository
 import io.github.nodyssey.data.NetworkCommunityRepository
 import io.github.nodyssey.data.NetworkCreditRepository
 import io.github.nodyssey.data.NetworkFollowRepository
+import io.github.nodyssey.data.NetworkInviteRepository
 import io.github.nodyssey.data.NetworkMessageRepository
 import io.github.nodyssey.data.NetworkPostDataSource
 import io.github.nodyssey.data.NetworkProfileRepository
@@ -64,6 +67,10 @@ import io.github.nodyssey.data.UserSpaceRepository
 import io.github.nodyssey.data.VoteRepository
 import io.github.nodyssey.data.account.AccountSettingsRepository
 import io.github.nodyssey.data.account.NetworkAccountSettingsRepository
+import io.github.nodyssey.data.attendance.AttendanceSession
+import io.github.nodyssey.data.attendance.AttendanceWriteGate
+import io.github.nodyssey.data.attendance.AutoAttendance
+import io.github.nodyssey.data.attendance.MultiAccountAttendance
 import io.github.nodyssey.data.composer.CommentComposerRepository
 import io.github.nodyssey.data.composer.DefaultCommentComposerRepository
 import io.github.nodyssey.data.composer.DefaultPostComposerRepository
@@ -85,6 +92,13 @@ import io.github.nodyssey.data.dns.OkHttpDnsResolutionTester
 import io.github.nodyssey.data.imagehost.DataStoreImageHostSettings
 import io.github.nodyssey.data.imagehost.DefaultImageHostRepository
 import io.github.nodyssey.data.imagehost.ImageHostRepository
+import io.github.nodyssey.data.lottery.LotteryRepository
+import io.github.nodyssey.data.lottery.LotteryStore
+import io.github.nodyssey.data.lottery.NetworkLotteryRepository
+import io.github.nodyssey.data.mail.DataStoreMailCredentialStore
+import io.github.nodyssey.data.mail.DefaultMailRepository
+import io.github.nodyssey.data.mail.MailRepository
+import io.github.nodyssey.data.mail.SeekMailCookieJar
 import io.github.nodyssey.data.offline.AndroidOfflineFileStore
 import io.github.nodyssey.data.offline.OfflineSettingsStore
 import io.github.nodyssey.data.offline.OkHttpOfflineImageSource
@@ -95,9 +109,12 @@ import io.github.nodyssey.data.proxy.NetworkProxyConnectionTester
 import io.github.nodyssey.data.proxy.ProxyClientKind
 import io.github.nodyssey.data.proxy.ProxyConnectionTester
 import io.github.nodyssey.data.proxy.ProxySettings
+import io.github.nodyssey.data.session.AccountLocalData
+import io.github.nodyssey.data.session.AccountRepository
+import io.github.nodyssey.data.session.AccountRequestGate
 import io.github.nodyssey.data.session.AccountSignOut
-import io.github.nodyssey.data.session.DefaultAccountSignOut
 import io.github.nodyssey.data.session.NodeSeekSignInRepository
+import io.github.nodyssey.data.session.SavedAccountStore
 import io.github.nodyssey.data.session.SessionRepository
 import io.github.nodyssey.data.session.SignInRepository
 import io.github.nodyssey.data.settings.ReportCompareStore
@@ -106,7 +123,11 @@ import io.github.nodyssey.data.sticker.GitHubStickerSource
 import io.github.nodyssey.data.sticker.StickerLibrary
 import io.github.nodyssey.data.update.AppUpdateRepository
 import io.github.nodyssey.data.update.DefaultAppUpdateRepository
+import io.github.nodyssey.notifications.AndroidLotteryPlatform
+import io.github.nodyssey.notifications.lotteryDataStore
+import io.github.nodyssey.platform.AndroidAccountCookies
 import io.github.nodyssey.platform.AndroidApkInstaller
+import io.github.nodyssey.platform.AndroidAttendanceCookies
 import io.github.nodyssey.platform.DefaultImagePreparer
 import io.github.nodyssey.platform.KeystoreSecretCipher
 import io.github.nodyssey.platform.customTabsProvider
@@ -125,6 +146,8 @@ import io.github.plaza.core.net.CrossOriginRefererInterceptor
 import io.github.plaza.core.net.OkHttpTransport
 import io.github.plaza.core.net.RetryingTransport
 import io.github.plaza.core.net.SessionCookies
+import io.github.plaza.core.net.SiteError
+import io.github.plaza.core.net.SiteException
 import io.github.plaza.core.net.SiteHtmlClient
 import io.github.plaza.core.net.UserAgent
 import io.github.plaza.core.net.WebViewCookieJar
@@ -136,14 +159,18 @@ import io.github.plaza.core.runCatchingExceptCancellation
 import io.github.plaza.core.update.ApkInstaller
 import io.github.plaza.core.update.UpdateManifestSource
 import io.github.plaza.core.update.isPreReleaseVersionName
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.Cache
 import okhttp3.ConnectionPool
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -189,12 +216,15 @@ class DefaultAppContainer(
     val site: Site = ActiveSite.current
     private val siteConfig = NodeSeekSite.configFor(site)
     private val lifetime = SiteTransportLifetime()
+    private val accountRequests = AccountRequestGate()
     override val isActive: Boolean get() = lifetime.isActive
     private val clients = mutableListOf<OkHttpClient>()
 
     override suspend fun <T> runSiteWork(block: suspend () -> T): T {
         lifetime.checkActive()
-        val work = appScope.async { block() }
+        accountRepository.awaitReady()
+        if (accountRepository.state.value.busy) throw CancellationException("Account is changing")
+        val work = appScope.async { accountRequests.run(block) }
         return try {
             work.await()
         } finally {
@@ -220,7 +250,15 @@ class DefaultAppContainer(
             client.cache?.close()
             lifetime.checkActive()
         }
-        client.newBuilder().addInterceptor { chain ->
+        client.newBuilder().addNetworkInterceptor { chain ->
+            val epoch = accountRequests.epoch
+            val response = chain.proceed(chain.request())
+            if (epoch != accountRequests.epoch) {
+                response.close()
+                throw IOException("Account changed")
+            }
+            response
+        }.addInterceptor { chain ->
             if (!isActive) throw IOException("Site graph retired")
             val response = chain.proceed(chain.request())
             if (!isActive) {
@@ -497,11 +535,13 @@ class DefaultAppContainer(
     private val transport by lazy {
         // Retry sits outside the signature: a retried vote is signed once and sent once, because
         // [RetryingTransport] never repeats a write.
-        lifetime.guard(
-            RetryingTransport(
-                DynamicSignTransport(
-                    CookieScrubbingTransport(OkHttpTransport(okHttpClient), sessionCookies),
-                    userAgent.value,
+        accountRequests.guard(
+            lifetime.guard(
+                RetryingTransport(
+                    DynamicSignTransport(
+                        CookieScrubbingTransport(OkHttpTransport(okHttpClient), sessionCookies),
+                        userAgent.value,
+                    ),
                 ),
             ),
         )
@@ -510,6 +550,23 @@ class DefaultAppContainer(
     private val htmlClient by lazy { SiteHtmlClient(transport, dispatchers, siteConfig) }
 
     private val jsonClient by lazy { NodeSeekJsonClient(transport, dispatchers) }
+
+    override val lotteryRepository: LotteryRepository by lazy {
+        NetworkLotteryRepository(
+            store = LotteryStore(appContext.lotteryDataStore, site),
+            source = jsonClient,
+            beaconTransport = lifetime.guard(OkHttpTransport(imageContentClient)),
+            dispatchers = dispatchers,
+            platform = AndroidLotteryPlatform(appContext, site),
+            currentProfile = {
+                if (!sessionRepository.peek().isSignedIn) throw SiteException(SiteError.LoginRequired)
+                profileRepository.profile()
+            },
+            sessionFingerprint = { sessionRepository.peek().fingerprint },
+            clock = clock,
+            site = site,
+        )
+    }
 
     override val proxyConnectionTester: ProxyConnectionTester by lazy {
         NetworkProxyConnectionTester(jsonClient)
@@ -640,8 +697,31 @@ class DefaultAppContainer(
         )
     }
 
+    private val attendanceWrites = AttendanceWriteGate()
+    override val automaticAttendance by lazy {
+        val legacy = AutoAttendance(
+            settingsRepository.automaticAttendance,
+            sessionRepository,
+            profileRepository,
+            assetsRepository,
+            clock,
+            appScope,
+        )
+        MultiAccountAttendance(accountRepository, settingsRepository.automaticAttendance, legacy, siteConfig, dispatchers, clock, appScope, attendanceWrites) { snapshot ->
+            val jar = AndroidAttendanceCookies(snapshot, siteConfig)
+            val isolated = okHttpClient.newBuilder().cookieJar(jar).cache(null).build()
+            val session = SessionCookies(siteConfig, jar)
+            AttendanceSession(
+                lifetime.guard(RetryingTransport(DynamicSignTransport(CookieScrubbingTransport(OkHttpTransport(isolated), session), userAgent.value))),
+                session,
+                { jar.snapshot() },
+                {},
+            )
+        }
+    }
+
     override val assetsRepository: AssetsRepository by lazy {
-        NetworkAssetsRepository(profileRepository, creditRepository, jsonClient, dispatchers, clock)
+        NetworkAssetsRepository(profileRepository, creditRepository, jsonClient, dispatchers, clock, attendanceWrites)
     }
 
     override val creditRepository: CreditRepository by lazy {
@@ -650,6 +730,10 @@ class DefaultAppContainer(
 
     override val stardustRepository: StardustRepository by lazy {
         NetworkStardustRepository(jsonClient, dispatchers)
+    }
+
+    override val inviteRepository: InviteRepository by lazy {
+        NetworkInviteRepository(jsonClient, dispatchers)
     }
 
     override val awardRepository: AwardRepository by lazy {
@@ -746,6 +830,24 @@ class DefaultAppContainer(
         )
     }
 
+    override val mailRepository: MailRepository by lazy {
+        // A 307/308 must never forward the provider's signed payload to another origin.
+        val mailClient = ownClient(imageHostClient.newBuilder().cookieJar(SeekMailCookieJar(cookieStore)).followRedirects(false).retryOnConnectionFailure(false).build())
+        val forumClient = ownClient(okHttpClient.newBuilder().followRedirects(false).retryOnConnectionFailure(false).build())
+        DefaultMailRepository(
+            credentials = DataStoreMailCredentialStore(appContext.mailDataStore, KeystoreSecretCipher()),
+            clock = clock,
+            http = OkHttpTransport(imageHostClient),
+            dispatchers = dispatchers,
+            sessionCookies = cookieStore,
+            sessionHttp = OkHttpTransport(mailClient),
+            // cAuth grants access despite being a GET; do not put RetryingTransport around it.
+            authorizationHttp = accountRequests.guard(
+                lifetime.guard(CookieScrubbingTransport(OkHttpTransport(forumClient), sessionCookies)),
+            ),
+        )
+    }
+
     private val imagePreparer: ImagePreparer by lazy { DefaultImagePreparer(appContext, dispatchers) }
 
     override val imageUploader: ImageUploader by lazy {
@@ -773,17 +875,36 @@ class DefaultAppContainer(
      */
     override val sessionRepository: SessionRepository by lazy { SessionRepository(sessionCookies) }
 
-    override val accountSignOut: AccountSignOut by lazy {
-        DefaultAccountSignOut(
-            posts = postRepository,
-            profiles = profileRepository,
-            offline = offlineLibrary,
-            postDrafts = postComposerRepository,
-            commentDrafts = commentComposerRepository,
-            settings = settingsRepository,
+    override val accountRepository: AccountRepository by lazy {
+        AccountRepository(
+            store = SavedAccountStore(appContext.accountsDataStore, KeystoreSecretCipher(), site.name),
+            cookies = AndroidAccountCookies(siteConfig),
             session = sessionRepository,
+            requests = accountRequests,
+            local = AccountLocalData(
+                appContext.postComposerDataStore(site),
+                appContext.commentComposerDataStore(site),
+                postRepository,
+                profileRepository,
+                offlineLibrary,
+                settingsRepository,
+                clearMail = mailRepository::disconnect,
+            ),
+            currentProfile = { profileRepository.profile(refresh = it) },
+            stopPlatformRequests = {
+                val opened = synchronized(clients) { clients.toList() }
+                opened.forEach { it.dispatcher.cancelAll() }
+                withTimeout(10_000) {
+                    while (opened.any { it.dispatcher.runningCallsCount() > 0 }) delay(20)
+                }
+                NotificationManagerCompat.from(appContext).cancelAll()
+            },
+            scope = CoroutineScope(appScope.coroutineContext + dispatchers.main),
+            legacyAttendance = { settingsRepository.automaticAttendance.config.first() },
         )
     }
+
+    override val accountSignOut: AccountSignOut by lazy { AccountSignOut { accountRepository.signOut() } }
 
     override val signInRepository: SignInRepository by lazy {
         NodeSeekSignInRepository(jsonClient, cookieWriteDiagnostics = {

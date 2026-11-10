@@ -4,6 +4,7 @@ import io.github.nodyssey.core.LevelSpan
 import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.core.net.JsonSource
 import io.github.nodyssey.core.net.NodeSeekJsonClient
+import io.github.nodyssey.data.attendance.AttendanceWriteGate
 import io.github.plaza.core.AppClock
 import io.github.plaza.core.AppDispatchers
 import io.github.plaza.core.net.SiteError
@@ -121,6 +122,7 @@ class NetworkAssetsRepository(
     private val jsonSource: JsonSource,
     private val dispatchers: AppDispatchers,
     private val clock: AppClock,
+    private val attendanceWrites: AttendanceWriteGate? = null,
 ) : AssetsRepository {
     private val json = Json { ignoreUnknownKeys = true }
     private val attendanceStatus = MutableStateFlow<AttendanceStatus?>(null)
@@ -234,26 +236,28 @@ class NetworkAssetsRepository(
     }
 
     override suspend fun signInForToday(mode: AttendanceMode): AttendanceResult {
+        val writes = attendanceWrites ?: return submitAttendance(mode)
+        val uid = profileRepository.profile().uid
+        return writes.run(uid) {
+            val status = refreshAttendanceStatus(uid)
+            if (status.hasSignedIn) AttendanceResult(status.gain, null) else submitAttendance(mode)
+        }
+    }
+
+    private suspend fun submitAttendance(mode: AttendanceMode): AttendanceResult {
         val response =
             jsonSource.postJson(
                 path = NodeSeekJsonClient.attendancePath(mode.wireValue),
                 referer = NodeSeekSite.BASE_URL + "/",
             )
         val result = withContext(dispatchers.default) {
-            /*
-             * The body is read before the status, and deliberately so: a repeat sign-in is answered
-             * with **HTTP 500** plus `{"success":false,"message":"今天已完成签到…"}` (verified on the
-             * live site). That sentence is the answer the user needs, so any parseable payload with a
-             * message wins over the status code; the status only matters once the body says nothing.
-             */
+            // The site answers an already-completed day with HTTP 500. Accept only that known
+            // refusal, rather than treating every JSON error message as a successful sign-in.
             val root = runCatching { json.parseToJsonElement(response.body) as? JsonObject }.getOrNull()
             val message = root?.text("message", "msg", "info")
-            // A bare `{"success":false}` is a refusal, not an answer: without the site's sentence
-            // there is nothing to show, so it falls through to the status-code handling below.
-            if (root != null && (message != null || root.bool("success") == true)) {
+            val alreadyCompleted = message?.contains("今天已完成签到") == true
+            if (alreadyCompleted || (response.isSuccessful && root?.bool("success") == true)) {
                 return@withContext AttendanceResult(
-                    // `current`/`coin` deliberately excluded: those carry the account balance, and
-                    // showing 4071 as today's gain would be worse than showing nothing.
                     gain = root.int("gain", "amount"),
                     message = message,
                 )
@@ -262,7 +266,7 @@ class NetworkAssetsRepository(
                 throw SiteException(SiteError.LoginRequired)
             }
             if (!response.isSuccessful) throw SiteException(SiteError.Http(response.code))
-            throw SiteException(SiteError.Unparsable)
+            throw SiteException(SiteError.Unparsable, detail = message)
         }
         profileRepository.selfUid.value?.let { uid ->
             val resolvedGain =

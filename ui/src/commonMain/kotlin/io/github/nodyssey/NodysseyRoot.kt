@@ -23,7 +23,9 @@ import io.github.nodyssey.data.settings.UserSettings
 import io.github.nodyssey.di.AppContainer
 import io.github.nodyssey.ui.common.ApplyDisplayRefreshRate
 import io.github.nodyssey.ui.common.LocalAppName
+import io.github.nodyssey.ui.common.LocalReadMarkPaint
 import io.github.nodyssey.ui.common.ProvideUserNotes
+import io.github.nodyssey.ui.common.ReadMarkPaint
 import io.github.nodyssey.ui.common.SystemBarsMatchTheme
 import io.github.nodyssey.ui.common.rememberBrowserLinks
 import io.github.nodyssey.ui.common.rememberReducedMotionEnabled
@@ -91,12 +93,14 @@ fun NodysseyRoot(
         val openAppLinkSettings = rememberAppLinkSettingsLauncher()
         val scope = rememberCoroutineScope()
         Box {
-            MainNavigation(
-                container = container,
-                initialTab = initialTab,
-                launchRequest = launchRequest,
-                onLaunchRequestHandled = onLaunchRequestHandled,
-            )
+            AccountBoundary(container, initialSettings) {
+                MainNavigation(
+                    container = container,
+                    initialTab = initialTab,
+                    launchRequest = launchRequest,
+                    onLaunchRequestHandled = onLaunchRequestHandled,
+                )
+            }
             /*
              * 新手引导, over the app rather than instead of it.
              *
@@ -139,6 +143,8 @@ internal fun NodysseyChrome(
     modifier: Modifier = Modifier,
     content: @Composable (storedSettings: UserSettings?) -> Unit,
 ) {
+    LotteryEffect(container)
+    AutomaticAttendanceEffect(container)
     // Theme reads the settings SSOT directly. No copy is kept anywhere, so changing the setting can
     // never leave part of the app on the old value.
     //
@@ -247,6 +253,13 @@ internal fun NodysseyChrome(
                 LocalReportFormat provides settings.reportFormat,
                 LocalReportCompareBasket provides reportCompareBasket,
                 LocalStickerSizing provides stickerSizing,
+                // 已读标记 rides here for the same reason 表情大小 does: three list surfaces paint a
+                // card and none of them owns the setting, so the answer has to arrive from above or
+                // it would drift between the feed and the search results. Null colour = the theme's.
+                LocalReadMarkPaint provides ReadMarkPaint(
+                    style = settings.readMarkStyle,
+                    color = settings.readMarkColor?.let { Color(it) },
+                ),
                 // 我的表情 rides here for the reason the basket does: three editors draw the panel and
                 // every post body's long press can add to it. See `LocalStickerLibrary`.
                 LocalStickerLibrary provides container.stickerLibrary,

@@ -13,6 +13,8 @@ import io.github.nodyssey.data.AttendanceMode
 import io.github.nodyssey.data.AttendanceStatus
 import io.github.nodyssey.data.ProfileRepository
 import io.github.nodyssey.data.UserProfile
+import io.github.nodyssey.data.lottery.LotteryRepository
+import io.github.nodyssey.data.mail.MailRepository
 import io.github.nodyssey.data.session.SessionRepository
 import io.github.nodyssey.di.AppContainer
 import io.github.nodyssey.ui.postlist.toSiteError
@@ -20,13 +22,19 @@ import io.github.plaza.core.net.SiteError
 import io.github.plaza.core.runCatchingExceptCancellation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -45,6 +53,8 @@ class ProfileViewModel(
     private val session: SessionRepository,
     private val profileRepository: ProfileRepository,
     private val assetsRepository: AssetsRepository,
+    lotteryRepository: LotteryRepository? = null,
+    mailRepository: MailRepository? = null,
 ) : ViewModel() {
     private var loadJob: Job? = null
     private var profileJob: Job? = null
@@ -60,6 +70,22 @@ class ProfileViewModel(
             ),
         )
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+    val hasUnreadLotteryResults: StateFlow<Boolean> =
+        (lotteryRepository?.entries ?: flowOf(emptyList()))
+            .map { entries -> entries.any { it.outcome != null && !it.resultRead } }
+            // A badge's local store being unavailable must not take down the profile screen.
+            .catch { emit(false) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val hasUnreadMail: StateFlow<Boolean> =
+        (
+            mailRepository?.let { mail ->
+                combine(mail.inboxUpdates, mail.readStates, mail.connection) { inbox, reads, connection ->
+                    connection.connected && inbox != null && inbox.generation == connection.generation &&
+                        inbox.page.messages.any { !(reads.values.takeIf { reads.generation == inbox.generation }?.get(it.id) ?: it.isRead) }
+                }
+            } ?: flowOf(false)
+            ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         assetsRepository
@@ -310,6 +336,8 @@ class ProfileViewModel(
                         session = container.sessionRepository,
                         profileRepository = container.profileRepository,
                         assetsRepository = container.assetsRepository,
+                        lotteryRepository = container.lotteryRepository,
+                        mailRepository = container.mailRepository,
                     )
                 }
             }

@@ -6,6 +6,7 @@ import io.github.nodyssey.data.PostRepository
 import io.github.nodyssey.data.ProfileRepository
 import io.github.nodyssey.data.composer.CommentComposerRepository
 import io.github.nodyssey.data.composer.PostComposerRepository
+import io.github.nodyssey.data.mail.MailRepository
 import io.github.nodyssey.data.settings.SettingsRepository
 
 /**
@@ -43,14 +44,39 @@ class DefaultAccountSignOut(
     /** Owns the poll worker's seen counts; stale ones would swallow the next account's first unread. */
     private val settings: SettingsRepository,
     private val session: SessionRepository,
+    private val mail: MailRepository,
 ) : AccountSignOut {
     override suspend fun signOut() {
-        posts.clearSessionData()
-        profiles.clearCachedProfile()
-        offline.clearAll()
-        postDrafts.deleteDraft()
-        commentDrafts.deleteAllDrafts()
-        settings.setNotificationSeenCounts(NotificationCounts())
+        mail.disconnect()
+        clearAccountContent(
+            posts,
+            profiles,
+            offline,
+            settings,
+            clearDrafts = {
+                postDrafts.deleteDraft()
+                commentDrafts.deleteAllDrafts()
+            },
+            clearMessages = settings.messageDrafts::clear,
+        )
         session.signOut()
     }
+}
+
+/** The same content boundary for logout and switching; switching archives drafts first. */
+internal suspend fun clearAccountContent(
+    posts: PostRepository,
+    profiles: ProfileRepository,
+    offline: OfflineLibrary,
+    settings: SettingsRepository,
+    clearDrafts: suspend () -> Unit,
+    clearMessages: suspend () -> Unit,
+    evictDownloads: Boolean = true,
+) {
+    posts.clearSessionData()
+    profiles.clearCachedProfile()
+    if (evictDownloads) offline.clearAll()
+    clearDrafts()
+    clearMessages()
+    settings.setNotificationSeenCounts(NotificationCounts())
 }

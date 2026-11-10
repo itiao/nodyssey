@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.nodyssey.core.ActiveSite
 import io.github.nodyssey.core.Site
+import io.github.nodyssey.data.MessageDraftStore
 import io.github.nodyssey.data.NotificationCounts
+import io.github.nodyssey.data.attendance.AutoAttendanceStore
 import io.github.nodyssey.data.update.UpdateCheckStore
 import io.github.nodyssey.model.FeedSort
 import io.github.nodyssey.model.SearchHistoryEntry
@@ -54,6 +56,10 @@ class SettingsRepository(
     private val disabledHomeBoardsKey = stringPreferencesKey("disabled_home_boards${site.storageSuffix}")
     private val alertLastPostIdKey = longPreferencesKey("keyword_alert_last_post_id${site.storageSuffix}")
 
+    val automaticAttendance = AutoAttendanceStore(dataStore, site)
+
+    val messageDrafts = MessageDraftStore(dataStore, site)
+
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 测评对比's basket, kept in this same store; see [ReportCompareStore]. */
@@ -85,6 +91,10 @@ class SettingsRepository(
                     ?.let { runCatching { PaletteStyle.valueOf(it) }.getOrNull() }
                     ?: PaletteStyle.SOFT,
                 savedThemes = decodeSavedThemes(preferences[KEY_SAVED_THEMES]),
+                readMarkStyle = preferences[KEY_READ_MARK_STYLE]
+                    ?.let { runCatching { ReadMarkStyle.valueOf(it) }.getOrNull() }
+                    ?: ReadMarkStyle.BLOCK,
+                readMarkColor = preferences[KEY_READ_MARK_COLOR],
                 fontScale = preferences[KEY_FONT_SCALE] ?: 1f,
                 oneHandMode = preferences[KEY_ONE_HAND_MODE] ?: true,
                 einkMode = preferences[KEY_EINK_MODE] ?: false,
@@ -138,6 +148,7 @@ class SettingsRepository(
                     // migration costs nothing and an older build finds its own keys intact.
                     ?: ((preferences[KEY_NOTIFY_MENTIONS] ?: true) || (preferences[KEY_NOTIFY_REPLIES] ?: true)),
                 notifyMessages = preferences[KEY_NOTIFY_MESSAGES] ?: true,
+                notifyMail = preferences[KEY_NOTIFY_MAIL] ?: false,
                 notifyKeywordAlerts = preferences[KEY_NOTIFY_KEYWORD_ALERTS] ?: true,
                 notifyTrackedThreads = preferences[KEY_NOTIFY_TRACKED_THREADS] ?: true,
                 readHistoryLimit = readHistoryLimit(preferences),
@@ -216,6 +227,19 @@ class SettingsRepository(
 
     /** 色彩风格 — how far the generated scheme travels from whichever seed is in force. */
     suspend fun setPaletteStyle(style: PaletteStyle) = edit { it[KEY_PALETTE_STYLE] = style.name }
+
+    /** 已读标记 — how a thread that has been opened is drawn in the lists that carry it. */
+    suspend fun setReadMarkStyle(style: ReadMarkStyle) = edit { it[KEY_READ_MARK_STYLE] = style.name }
+
+    /**
+     * 已读标记's colour, as ARGB, or null to follow the theme.
+     *
+     * Null is the default rather than a colour of its own, so that a reader who never opens this
+     * setting gets a mark that stays inside their theme; a stored value is theirs alone and survives
+     * a theme change exactly as 我的主题 does.
+     */
+    suspend fun setReadMarkColor(argb: Int?) =
+        edit { preferences -> if (argb == null) preferences.remove(KEY_READ_MARK_COLOR) else preferences[KEY_READ_MARK_COLOR] = argb }
 
     /**
      * 我的主题 — appends, or renames in place when the colour is already saved.
@@ -345,6 +369,8 @@ class SettingsRepository(
         edit { it[KEY_NOTIFY_INTERACTIONS] = enabled }
 
     suspend fun setNotifyMessages(enabled: Boolean) = edit { it[KEY_NOTIFY_MESSAGES] = enabled }
+
+    suspend fun setNotifyMail(enabled: Boolean) = edit { it[KEY_NOTIFY_MAIL] = enabled }
 
     suspend fun setNotifyKeywordAlerts(enabled: Boolean) = edit { it[KEY_NOTIFY_KEYWORD_ALERTS] = enabled }
 
@@ -669,6 +695,10 @@ class SettingsRepository(
         private val KEY_WALLPAPER_AUTO_UPDATE = booleanPreferencesKey("wallpaper_auto_update")
         private val KEY_PALETTE_STYLE = stringPreferencesKey("palette_style")
         private val KEY_SAVED_THEMES = stringPreferencesKey("saved_themes")
+        private val KEY_READ_MARK_STYLE = stringPreferencesKey("read_mark_style")
+
+        /** Absent means "the theme's colour"; see `setReadMarkColor`. */
+        private val KEY_READ_MARK_COLOR = intPreferencesKey("read_mark_color")
 
         /** 石墨青, the colour the app has always been, now as the seed every scheme starts from. */
         const val DEFAULT_SEED_COLOR: Int = 0xFF35606E.toInt()
@@ -746,6 +776,7 @@ class SettingsRepository(
         private val KEY_NOTIFY_MENTIONS = booleanPreferencesKey("notify_mentions")
         private val KEY_NOTIFY_REPLIES = booleanPreferencesKey("notify_replies")
         private val KEY_NOTIFY_MESSAGES = booleanPreferencesKey("notify_messages")
+        private val KEY_NOTIFY_MAIL = booleanPreferencesKey("notify_mail")
         private val KEY_NOTIFY_KEYWORD_ALERTS = booleanPreferencesKey("notify_keyword_alerts")
         private val KEY_NOTIFY_TRACKED_THREADS = booleanPreferencesKey("notify_tracked_threads")
         private val KEY_SEEN_REPLIES = intPreferencesKey("notification_seen_replies")
@@ -870,6 +901,24 @@ data class UserSettings(
     val paletteStyle: PaletteStyle = PaletteStyle.SOFT,
     /** 我的主题 — hand-picked seeds the reader named and kept. Oldest first; see `saveTheme`. */
     val savedThemes: List<SavedTheme> = emptyList(),
+    /**
+     * 已读标记 — how a thread the reader has already opened is drawn in a list.
+     *
+     * [ReadMarkStyle.BLOCK] by default, which is what makes the answer visible at a glance: the card
+     * itself changes colour rather than only its title. That is a deliberate departure from a
+     * dimmed title alone, which shipped first and turned out to be indistinguishable in a scrolling
+     * feed — one tonal step on one line of text is not a state, it is a slightly quieter line.
+     */
+    val readMarkStyle: ReadMarkStyle = ReadMarkStyle.BLOCK,
+    /**
+     * 已读标记's colour as ARGB, or null to follow the theme.
+     *
+     * Null on a fresh install: the mark then takes the scheme's own primary, so it belongs to the
+     * theme until the reader says otherwise. A stored value is theirs and is used verbatim — the
+     * mark is a statement about the list, not about the palette, and it is not meant to be re-derived
+     * from the seed every time that changes.
+     */
+    val readMarkColor: Int? = null,
     val fontScale: Float = 1f,
     /**
      * 单手模式 — whether a second-level screen opens with its title dropped into a band of blank
@@ -995,6 +1044,8 @@ data class UserSettings(
      */
     val notifyInteractions: Boolean = true,
     val notifyMessages: Boolean = true,
+    /** New-mail polling is opt-in; it uses the shared notification schedule when enabled. */
+    val notifyMail: Boolean = false,
     /** 提醒关键词: a new thread whose title holds one of them. Off-able without deleting the words. */
     val notifyKeywordAlerts: Boolean = true,
     /** 追踪新回复: new replies on a thread the reader chose to follow. */
@@ -1078,6 +1129,23 @@ enum class ColorSource { PRESET, WALLPAPER, CUSTOM }
  * to survive a rename on either side of that line.
  */
 enum class PaletteStyle { SOFT, VIBRANT, EXPRESSIVE, NEUTRAL, MONOCHROME }
+
+/**
+ * 已读标记 — what a list does with a thread the reader has already opened.
+ *
+ * Stored by name on disk, so a constant may be added but never renamed.
+ *
+ * [BLOCK] and [UNREAD_BLOCK] are the same tint pointed at opposite halves of the list: one marks
+ * what has been read, the other what has not. Both exist because readers disagree about which half
+ * is the one worth looking at — a feed being scanned for something new is looking for the blank
+ * cards, and a feed being re-read is looking for the marked ones — and the code behind them differs
+ * by one boolean.
+ *
+ * [DIM] is the behaviour that shipped before this setting: the title alone, one tonal step quieter.
+ * Kept rather than replaced because it is the only option that adds no colour to the page at all,
+ * which is the whole point on a busy theme or on a panel that cannot show a tint.
+ */
+enum class ReadMarkStyle { BLOCK, UNREAD_BLOCK, DIM, OFF }
 
 /**
  * One entry of 我的主题.

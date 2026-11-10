@@ -8,6 +8,12 @@ import io.github.plaza.core.net.CLOUDFLARE_CHALLENGE_MARKERS
  */
 object Selectors {
 
+    // Safe text conversion for email HTML; these depend on HTML semantics rather than forum markup.
+    const val MAIL_ACTIVE_CONTENT = "script,style,iframe,object,embed,svg,form,input,noscript,template,head"
+    const val MAIL_LINK = "a[href]"
+    const val MAIL_BLOCK = "p,div,section,article,header,footer,h1,h2,h3,h4,h5,h6,li,tr,blockquote,pre,hr"
+    const val MAIL_CELL = "td,th"
+
     // --- Topic list ---------------------------------------------------------
     const val LIST_ITEM = "ul.post-list > li.post-list-item"
     const val LIST_TITLE_LINK = "div.post-title > a[href]"
@@ -88,6 +94,19 @@ object Selectors {
     const val CONTENT_INFO = "div.content-info"
     const val CONTENT_CATEGORY = "span.content-category a"
     const val CONTENT_FLOOR = "a.floor-link"
+
+    /**
+     * 置顶 on a floor: a bare pin ahead of the floor number, the site's mark for a comment a
+     * moderator pinned.
+     *
+     * `<svg title="置顶" class="iconpark-icon pined-comment-badge"><use href="#pin"></use></svg>`,
+     * inside `div.floor-link-wrapper`. Captured on 2026-11-02 from `/post-1026936-1`, where #2
+     * carried it and the server had already rendered that floor above #1 — the page arrives in the
+     * order the site shows, so nothing downstream re-sorts. The class is misspelled on the wire, the
+     * same way the blob's `pined` field is, and is matched as written.
+     */
+    const val CONTENT_PINNED_BADGE = "div.floor-link-wrapper svg.pined-comment-badge"
+
     const val CONTENT_ARTICLE = "article.post-content"
     const val CONTENT_SIGNATURE = "div.signature"
 

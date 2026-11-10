@@ -15,6 +15,8 @@ import io.github.nodyssey.ui.composer.PostComposerRoute
 import io.github.nodyssey.ui.composer.PostComposerViewModel
 import io.github.nodyssey.ui.composer.ReplyComposerViewModel
 import io.github.nodyssey.ui.login.WebViewGoal
+import io.github.nodyssey.ui.lottery.LotteryPostDraws
+import io.github.nodyssey.ui.lottery.LotteryViewModel
 import io.github.nodyssey.ui.postdetail.PostDetailRoute
 import io.github.nodyssey.ui.postdetail.PostDetailViewModel
 import io.github.nodyssey.ui.stardust.StardustReceiveCard
@@ -95,7 +97,7 @@ internal fun EntryProviderScope<NavKey>.threadEntries(nav: StackEntryScope) = wi
             // By identity: the stack hands the entry this very key, and an equal key further down
             // is a different page.
             replyCovered = backStack.lastOrNull() !== key,
-            showBackButton = !(isListDetailExpanded() && backStack.showsListPane()),
+            showBackButton = !(isListDetailExpanded() && backStack.sitsBesideList(key)),
             onBack = { backStack.removeLastOrNull() },
             onOpenBrowser = openWebUrl,
             // A link to this same thread stays on this screen; see [PostDetailViewModel.openLinkInPlace].
@@ -132,6 +134,20 @@ internal fun EntryProviderScope<NavKey>.threadEntries(nav: StackEntryScope) = wi
                     ),
                     onSignIn = { backStack.add(SignInKey) },
                 )
+            },
+            lotteryContent = { body, title, signedIn ->
+                if (container.lotteryRepository != null) {
+                    LotteryPostDraws(
+                        viewModel = viewModel(key = "lottery-${key.postId}", factory = LotteryViewModel.factory(container)),
+                        body = body,
+                        postId = key.postId,
+                        title = title,
+                        signedIn = signedIn,
+                        onSignIn = { backStack.add(SignInKey) },
+                        onOpenBrowser = openWebUrl,
+                        onVerify = { backStack.add(WebKey(it, siteTitle, WebViewGoal.CHALLENGE)) },
+                    )
+                }
             },
             shareImage = rememberShareImage(container.dispatchers),
         )

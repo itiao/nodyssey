@@ -45,7 +45,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -167,6 +166,7 @@ import io.github.nodyssey.ui.resources.post_author_scan_retry
 import io.github.nodyssey.ui.resources.post_auto_paging
 import io.github.nodyssey.ui.resources.post_badge_awarded
 import io.github.nodyssey.ui.resources.post_badge_original_poster
+import io.github.nodyssey.ui.resources.post_badge_pinned
 import io.github.nodyssey.ui.resources.post_body_copied
 import io.github.nodyssey.ui.resources.post_body_empty
 import io.github.nodyssey.ui.resources.post_collect_action
@@ -229,6 +229,7 @@ import io.github.plaza.designsys.component.MetaText
 import io.github.plaza.designsys.component.PlazaIcons
 import io.github.plaza.designsys.component.PlazaSpinner
 import io.github.plaza.designsys.component.QuotePreview
+import io.github.plaza.designsys.component.ReadableTopBar
 import io.github.plaza.designsys.component.SkeletonBar
 import io.github.plaza.designsys.component.TonalTag
 import io.github.plaza.designsys.component.TonalTile
@@ -275,6 +276,7 @@ fun PostDetailRoute(
     stardustContent: (@Composable (RichNode.StardustReceive) -> Unit)? = null,
     /** 分享为图片's hand-off to the platform; null hides the row. See [PostDetailScreen]. */
     shareImage: (suspend (ImageBitmap, String?) -> Boolean)? = null,
+    lotteryContent: @Composable (PostContent, String, Boolean) -> Unit = { _, _, _ -> },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.hasContent, state.totalPages, state.lastFloor, state.isLoading, state.isRefreshing) {
@@ -327,6 +329,9 @@ fun PostDetailRoute(
         stardustContent = stardustContent,
         replyOpen = replyState.visible,
         shareImage = shareImage,
+        lotteryContent = {
+            state.body?.takeIf { !it.isBlocked || state.showBlockedContent }?.let { lotteryContent(it, state.title, state.isSignedIn) }
+        },
         modifier = modifier,
     )
 
@@ -431,6 +436,7 @@ fun PostDetailScreen(
      * preview, a test, a platform with no sheet — hides 分享为图片 from the floor panel.
      */
     shareImage: (suspend (ImageBitmap, String?) -> Boolean)? = null,
+    lotteryContent: @Composable () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     var isScrollbarDragging by remember { mutableStateOf(false) }
@@ -868,6 +874,7 @@ fun PostDetailScreen(
                                     voteContent = voteContent,
                                     stardustContent = stardustContent,
                                     onTitleBottom = { collapsedTitleThreshold = it },
+                                    lotteryContent = lotteryContent,
                                 )
                             }
                         }
@@ -1084,131 +1091,134 @@ private fun DetailTopBar(
     val linkCopied = stringResource(Res.string.post_link_copied)
     val shareLabel = stringResource(Res.string.action_share)
 
-    TopAppBar(
-        title = {
-            // Clickable only while the bar is actually showing the title: the collapsed bar is where
-            // a reader deep in someone else's page 7 meets the title at all, and an invisible tap
-            // target over an empty bar is worse than no affordance.
-            val jump = onTitleClick?.takeIf { showTitle }
-            Text(
-                text = if (showTitle) title else "",
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = if (jump != null) {
-                    Modifier.clickable(onClick = jump).semantics {
-                        contentDescription = openOriginalPostLabel
-                    }
-                } else {
-                    Modifier
-                },
-            )
-        },
-        navigationIcon = {
-            if (showBackButton) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(Res.string.action_back),
-                        modifier = Modifier.size(TopBarIconSize),
-                    )
-                }
-            }
-        },
-        actions = {
-            IconButton(onClick = onOpenInBrowser) {
-                Icon(
-                    PlazaIcons.OpenInNew,
-                    contentDescription = stringResource(Res.string.action_open_in_browser),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(TopBarIconSize),
+    ReadableTopBar { barInsets ->
+        TopAppBar(
+            windowInsets = barInsets,
+            title = {
+                // Clickable only while the bar is actually showing the title: the collapsed bar is where
+                // a reader deep in someone else's page 7 meets the title at all, and an invisible tap
+                // target over an empty bar is worse than no affordance.
+                val jump = onTitleClick?.takeIf { showTitle }
+                Text(
+                    text = if (showTitle) title else "",
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (jump != null) {
+                        Modifier.clickable(onClick = jump).semantics {
+                            contentDescription = openOriginalPostLabel
+                        }
+                    } else {
+                        Modifier
+                    },
                 )
-            }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
+            },
+            navigationIcon = {
+                if (showBackButton) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(Res.string.action_back),
+                            modifier = Modifier.size(TopBarIconSize),
+                        )
+                    }
+                }
+            },
+            actions = {
+                IconButton(onClick = onOpenInBrowser) {
                     Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = stringResource(Res.string.action_more),
+                        PlazaIcons.OpenInNew,
+                        contentDescription = stringResource(Res.string.action_open_in_browser),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(TopBarIconSize),
                     )
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    onOriginal?.let { jump ->
-                        DropdownMenuItem(
-                            text = { Text(openOriginalPostLabel) },
-                            onClick = {
-                                menuOpen = false
-                                jump()
-                            },
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = stringResource(Res.string.action_more),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(TopBarIconSize),
                         )
                     }
-                    onJumpToFloor?.let { jump ->
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        onOriginal?.let { jump ->
+                            DropdownMenuItem(
+                                text = { Text(openOriginalPostLabel) },
+                                onClick = {
+                                    menuOpen = false
+                                    jump()
+                                },
+                            )
+                        }
+                        onJumpToFloor?.let { jump ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.post_floor_jump)) },
+                                onClick = {
+                                    menuOpen = false
+                                    jump()
+                                },
+                            )
+                        }
+                        collected?.let { saved ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (saved) Res.string.post_collected_action else Res.string.post_collect_action)) },
+                                enabled = !collectPending,
+                                onClick = {
+                                    menuOpen = false
+                                    onCollect()
+                                },
+                            )
+                        }
+                        // The menu twin of pull-to-refresh, for the reader who is thirty floors down and
+                        // not about to scroll back up to pull.
                         DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.post_floor_jump)) },
+                            text = { Text(stringResource(Res.string.action_refresh)) },
                             onClick = {
                                 menuOpen = false
-                                jump()
+                                onRefresh()
                             },
                         )
-                    }
-                    collected?.let { saved ->
                         DropdownMenuItem(
-                            text = { Text(stringResource(if (saved) Res.string.post_collected_action else Res.string.post_collect_action)) },
-                            enabled = !collectPending,
+                            text = { Text(stringResource(Res.string.action_copy_link)) },
+                            onClick = {
+                                copy("post", postUrl, linkCopied)
+                                menuOpen = false
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(shareLabel) },
                             onClick = {
                                 menuOpen = false
-                                onCollect()
+                                shareText("$title\n$postUrl", shareLabel)
                             },
                         )
-                    }
-                    // The menu twin of pull-to-refresh, for the reader who is thirty floors down and
-                    // not about to scroll back up to pull.
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.action_refresh)) },
-                        onClick = {
-                            menuOpen = false
-                            onRefresh()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.action_copy_link)) },
-                        onClick = {
-                            copy("post", postUrl, linkCopied)
-                            menuOpen = false
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(shareLabel) },
-                        onClick = {
-                            menuOpen = false
-                            shareText("$title\n$postUrl", shareLabel)
-                        },
-                    )
-                    tracked?.let { on ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(stringResource(if (on) Res.string.post_untrack_thread else Res.string.post_track_thread))
-                            },
-                            onClick = {
-                                menuOpen = false
-                                onToggleTrack()
-                            },
-                        )
+                        tracked?.let { on ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(stringResource(if (on) Res.string.post_untrack_thread else Res.string.post_track_thread))
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleTrack()
+                                },
+                            )
+                        }
                     }
                 }
-            }
-        },
-        // The controls and the reading column share one paper surface.
-        colors =
-        TopAppBarDefaults.topAppBarColors(
-            containerColor = pageColor,
-            scrolledContainerColor = pageColor,
-        ),
-        // A step under Material's 64dp, as 2b draws it: the bar holds three icons and, once the title
-        // has scrolled away, one line of it. The buttons keep their 48dp targets.
-        expandedHeight = TopBarHeight,
-    )
+            },
+            // The controls and the reading column share one paper surface.
+            colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = pageColor,
+                scrolledContainerColor = pageColor,
+            ),
+            // A step under Material's 64dp, as 2b draws it: the bar holds three icons and, once the title
+            // has scrolled away, one line of it. The buttons keep their 48dp targets.
+            expandedHeight = TopBarHeight,
+        )
+    }
 }
 
 private val TopBarHeight = 48.dp
@@ -1249,6 +1259,7 @@ private fun ThreadList(
     stardustContent: (@Composable (RichNode.StardustReceive) -> Unit)?,
     /** Where the title ends inside the opening item, in px — see its use in [PostDetailScreen]. */
     onTitleBottom: (Int) -> Unit,
+    lotteryContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val original = state.postReplyStyle == PostReplyStyle.ORIGINAL
@@ -1369,6 +1380,7 @@ private fun ThreadList(
                     showOpeningPost = state.firstLoadedPage == 1 && !state.onlyAuthor,
                 )
             }
+            if (state.firstLoadedPage == 1 && !state.onlyAuthor) lotteryContent()
             if (state.postReplyStyle == PostReplyStyle.FLAT) {
                 Spacer(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceContainer))
             }
@@ -1977,7 +1989,7 @@ private fun OriginalOpeningPost(
                 // The official opening post puts the time under the name, not at the far edge.
                 subtitle = { if (body != null) FloorTimeLine(body) else MetaLinePlaceholder() },
             )
-            body?.floor?.let { FloorLabel(it) }
+            body?.let { FloorLabel(it) }
         }
 
         if (body == null) {
@@ -2178,8 +2190,8 @@ private fun CommentsHeader(
  * stands beside the name and badges, with time and floor at the far end. The body starts below
  * the whole header so images, quotes and long text can use the full reading width.
  *
- * The foot carries 点赞, 引用 and 回复, with a ⋯ for the priced reactions and the remaining
- * actions, which [FloorActionSheet] lays out with their prices. A long press on
+ * The foot carries 点赞, 投喂 and 回复, with a ⋯ for 引用, 反对 and the remaining
+ * actions. [FloorActionSheet] also shows each reaction's price. A long press on
  * the header or the foot opens the same panel; on the text it selects, as it always has — see
  * [floorLongPress] for why the row as a whole does not listen.
  */
@@ -2239,7 +2251,7 @@ private fun CommentRow(
                 }
                 FloorTimeLine(comment)
             }
-            comment.floor?.let { FloorLabel(it) }
+            FloorLabel(comment)
         }
         ReportOriginFloor(comment.floor) {
             ImageActionsFrom(comment.authorName, comment.floor) {
@@ -2350,7 +2362,7 @@ private fun OriginalCommentRow(
                             FloorBadges(comment, hasAccountLevel = showAuthorAccountInfo && authorInfo?.level != null)
                             UserNoteTag(comment.authorUid)
                         }
-                        comment.floor?.let { FloorLabel(it) }
+                        FloorLabel(comment)
                     }
                     FloorTimeLine(comment)
                 }
@@ -2457,7 +2469,7 @@ private fun FloorMetadata(content: PostContent) {
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         FloorTimeLine(content)
-        content.floor?.let { FloorLabel(it) }
+        FloorLabel(content)
     }
 }
 
@@ -2604,9 +2616,9 @@ private fun OriginalOpeningActions(
     }
 }
 
-/** One tonal pill of the official opening row, at the 32dp the pre-fork build drew. */
+/** One transparent action of the official opening row, retaining its compact height. */
 @Composable
-private fun OriginalReactionPill(
+private fun OriginalReactionButton(
     action: ReactionAction,
     text: String,
     spent: Boolean,
@@ -2614,26 +2626,15 @@ private fun OriginalReactionPill(
     onClick: (() -> Unit)?,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val layers = LocalPlazaLayers.current
-    val (container, content) =
-        when (action) {
-            ReactionAction.Upvote ->
-                if (spent) scheme.primary to scheme.onPrimary else scheme.primaryContainer to scheme.onPrimaryContainer
-
-            else ->
-                if (spent) scheme.tertiaryContainer to scheme.onTertiaryContainer else layers.inset to scheme.onSurface
-        }
-    FilledTonalButton(
+    val content = if (spent) scheme.primary else scheme.onSurfaceVariant
+    TextButton(
         onClick = onClick ?: {},
         enabled = onClick != null && !spent && !pending,
         colors =
-        ButtonDefaults.filledTonalButtonColors(
-            containerColor = container,
+        ButtonDefaults.textButtonColors(
             contentColor = content,
-            disabledContainerColor = if (spent) container else container.copy(alpha = 0.45f),
             disabledContentColor = if (spent) content else content.copy(alpha = 0.45f),
         ),
-        border = layers.cardBorderStroke,
         shape = MaterialTheme.shapes.medium,
         contentPadding = PaddingValues(horizontal = 10.dp),
         modifier = Modifier.height(32.dp),
@@ -2641,7 +2642,7 @@ private fun OriginalReactionPill(
         if (pending) {
             PlazaSpinner(modifier = Modifier.describedAsLoading(), strokeWidth = 2.dp, size = 16.dp)
         } else {
-            Icon(action.icon(), contentDescription = stringResource(action.labelRes()), modifier = Modifier.size(16.dp))
+            Icon(action.icon(filled = spent), contentDescription = stringResource(action.labelRes()), modifier = Modifier.size(16.dp))
         }
         if (text.isNotEmpty()) {
             Text(
@@ -2656,16 +2657,17 @@ private fun OriginalReactionPill(
 
 /** A spent reaction stays accented and inert; the existing confirmation gate still owns spending. */
 @Composable
-private fun ReactionPill(
+private fun ReactionButton(
     action: ReactionAction,
     reactions: PostReactions?,
     pending: ReactionAction?,
     onReact: (ReactionAction) -> Unit,
+    showZeroCount: Boolean = false,
 ) {
     FloorActionButton(
-        icon = action.icon(),
+        icon = action.icon(filled = reactions?.hasSpent(action) == true),
         label = action.labelRes(),
-        count = reactions?.countOf(action)?.takeIf { it > 0 }?.toString().orEmpty(),
+        count = reactions?.countOf(action)?.takeIf { showZeroCount || it > 0 }?.toString().orEmpty(),
         spent = reactions?.hasSpent(action) == true,
         pending = pending == action,
         onClick = if (reactions != null && pending == null) ({ onReact(action) }) else null,
@@ -2782,7 +2784,7 @@ private fun FloorMoreButton(onClick: () -> Unit, compact: Boolean = false) {
     FloorActionButton(PlazaIcons.MoreHoriz, Res.string.post_floor_actions, onClick = onClick, compact = compact)
 }
 
-/** Material buttons keep their minimum touch targets while drawing a compact rounded pill. */
+/** Transparent Material buttons retain touch targets and accent completed or selected actions. */
 @Composable
 private fun FloorActionButton(
     icon: ImageVector,
@@ -2797,17 +2799,14 @@ private fun FloorActionButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val accented = spent || selected
-    val container = if (accented) scheme.primaryContainer else Color.Transparent
-    val content = if (accented) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    val content = if (accented) scheme.primary else scheme.onSurfaceVariant
     val description = stringResource(label)
-    FilledTonalButton(
+    TextButton(
         onClick = onClick ?: {},
         enabled = onClick != null && !spent && !pending,
         shape = CircleShape,
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = container,
+        colors = ButtonDefaults.textButtonColors(
             contentColor = content,
-            disabledContainerColor = container,
             disabledContentColor = if (accented || pending) content else content.copy(alpha = 0.45f),
         ),
         contentPadding = PaddingValues(horizontal = if (compact) 2.dp else 6.dp, vertical = 0.dp),
@@ -2821,9 +2820,8 @@ private fun FloorActionButton(
         if (pending) {
             PlazaSpinner(modifier = Modifier.describedAsLoading(), strokeWidth = 2.dp, size = 18.dp)
         } else {
-            // Equal vector boxes are not equal marks: ThumbUp fills almost its whole viewport,
-            // whereas FormatQuote has generous internal whitespace. Match their visible size
-            // and centre of ink while keeping every button on the same minimum touch target.
+            // ThumbUp fills almost its whole viewport, so use a smaller box to match the other
+            // glyphs while keeping every button on the same minimum touch target.
             val glyphSize =
                 if (compact) {
                     when (label) {
@@ -2833,7 +2831,6 @@ private fun FloorActionButton(
                 } else {
                     when (label) {
                         Res.string.post_reaction_like -> 16.dp
-                        Res.string.post_quote_action -> 22.dp
                         else -> 20.dp
                     }
                 }
@@ -2862,8 +2859,8 @@ private fun FloorActionButton(
 private fun footLabelStyle(): TextStyle =
     MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium, fontFeatureSettings = TABULAR_FIGURES)
 
-/** Each mark's glyph, wherever it is drawn — the row, the pill, the 1c tile. */
-private fun ReactionAction.icon(): ImageVector =
+/** Reading rows outline an unspent upvote; action-sheet tiles keep their filled glyphs. */
+private fun ReactionAction.icon(filled: Boolean = true): ImageVector =
     when (this) {
         // Outlined rather than filled: the site draws these three as line marks, and a filled thumb
         // beside a line-drawn star and quote reads as a different weight of button.
@@ -3363,14 +3360,33 @@ private fun List<InlineNode>.plainText(): String = joinToString("") { inline ->
     }
 }
 
-/** Tabular figures so `#9` and `#127` sit on the same right edge as the list scrolls. */
+/**
+ * The floor's number, with the pin a 置顶 floor wears ahead of it.
+ *
+ * The site draws only the glyph — an `svg` with `title="置顶"` — so the word travels as the icon's
+ * accessible name here: "2楼" on its own neither reads nor looks pinned.
+ */
 @Composable
-internal fun FloorLabel(floor: String) {
-    Text(
-        text = stringResource(Res.string.post_floor_number, floor.removePrefix("#")),
-        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = TABULAR_FIGURES),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+internal fun FloorLabel(content: PostContent) {
+    val floor = content.floor ?: return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        if (content.isPinned) {
+            Icon(
+                imageVector = PlazaIcons.PushPin,
+                contentDescription = stringResource(Res.string.post_badge_pinned),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+        Text(
+            text = stringResource(Res.string.post_floor_number, floor.removePrefix("#")),
+            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = TABULAR_FIGURES),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 private const val THREAD_HEADER_ITEMS = 2
