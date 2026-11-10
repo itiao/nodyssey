@@ -34,10 +34,11 @@ private val GlassBlurRadius = 22.dp
  *
  * The other half of the frosted look, and the one worth tuning: too high and the bar is a slab that
  * happens to be blurred, too low and the icons stop reading against a light row. It started at 0.74
- * and read as opaque, went to 0.42, and sits at 0.25 — a quarter of the page colour, so the blur is
- * what the bar mostly is.
+ * and read as opaque, went to 0.42 and then 0.25, and sits at 0.01 — no sheet at all, so the bar is
+ * nothing but the blur of what passes under it. The tint stays in the recipe rather than going to
+ * zero because a bare `background(Color.Transparent)` is dropped by the draw pipeline.
  */
-const val GLASS_TINT_ALPHA = 0.25f
+const val GLASS_TINT_ALPHA = 0.01f
 
 /**
  * The blur recipe, shared by every glass surface so the strip and the bar are the same glass.
