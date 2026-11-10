@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -44,6 +44,8 @@ import androidx.navigation3.runtime.NavKey
 import io.github.nodyssey.NotificationsKey
 import io.github.nodyssey.PostListKey
 import io.github.nodyssey.ProfileKey
+import io.github.nodyssey.ui.common.LocalHazeState
+import io.github.nodyssey.ui.common.glassBar
 import io.github.nodyssey.ui.postlist.HomeAccount
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.action_create_post
@@ -117,7 +119,17 @@ fun NodysseyBottomBar(
     onSearch: () -> Unit = {},
     onCreatePost: () -> Unit = {},
 ) {
-    Surface(color = LocalPlazaLayers.current.card, modifier = modifier.fillMaxWidth()) {
+    val haze = LocalHazeState.current
+    val shape = RoundedCornerShape(topStart = FloatingBarCorner, topEnd = FloatingBarCorner)
+    // Glass when something behind it can be blurred, a plain sheet when it cannot — the render
+    // harness and the previews draw the bar on its own, with no feed under it to sample.
+    val glass =
+        if (haze != null) {
+            Modifier.glassBar(state = haze, shape = shape, tint = LocalPlazaLayers.current.card.copy(alpha = 0.74f))
+        } else {
+            Modifier.background(LocalPlazaLayers.current.card)
+        }
+    Box(modifier.fillMaxWidth().then(glass)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -263,6 +275,9 @@ private fun BottomBarItem(
 
 /** 56dp: the row the glyphs sit in, without the system's gesture inset under it. */
 val BottomBarHeight = 56.dp
+
+/** The radius the floating bar's top corners are cut to, so it reads as a sheet over the feed. */
+private val FloatingBarCorner = 20.dp
 
 /** The pill around the selected glyph, a step under Material's 64×32 so it fits a 56dp row. */
 private val IndicatorWidth = 64.dp

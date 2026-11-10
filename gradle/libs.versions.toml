@@ -21,6 +21,7 @@ androidxMaterialIcons = "1.7.8"
 # 1.13.0-alpha01, so a 1.12 line here would have put a 1.13 foundation and runtime under a 1.12 `ui`
 # on Android alone, while the other targets stayed on 1.12 throughout. This keeps every target on one
 # Compose, alpha as it is. Its Android pointers ask for androidx ui 1.13.0-alpha02.
+haze = "2.1.0"
 composeMultiplatform = "1.13.0-alpha01"
 # Material 3 is versioned on its own line in Compose Multiplatform and usually trails the rest of it;
 # at 1.13.0-alpha01 the two happen to meet. On Android it asks for androidx material3 1.5.0-alpha27,
@@ -85,6 +86,9 @@ spotless = "8.10.2"
 ktlint = "1.8.0"
 
 [libraries]
+# Backdrop blur for the floating bars: Compose can only blur its own content, not what is behind it.
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "androidxWebkit" }
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscrypt" }
 conscrypt-openjdk = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "conscrypt" }

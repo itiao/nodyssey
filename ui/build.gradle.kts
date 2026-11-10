@@ -71,6 +71,11 @@ kotlin {
             // `ui-tooling-preview` and the icons on its `api` face.
             api(project(":designsys"))
 
+            // Backdrop blur for the floating board strip and bottom bar. `haze` captures what is
+            // behind a bar; `haze-blur` is the effect that blurs it.
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
+
             // The repositories, the domain model and the database. `api` for the same reason: a
             // `ViewModel` constructor takes a repository and its state holds domain types.
             api(project(":shared"))

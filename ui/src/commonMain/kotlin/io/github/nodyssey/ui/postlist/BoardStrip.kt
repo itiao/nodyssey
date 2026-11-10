@@ -159,6 +159,7 @@ internal fun BoardStrip(
     highlightedSlug: String?,
     onBoardClick: (String?) -> Unit,
     onArrangementChange: (order: List<String>, parked: Set<String>) -> Unit,
+    modifier: Modifier = Modifier,
     // The feed's order, and the way to change it. It lives here because the sort menu's home is the
     // first pill — 综合 — held down: the header that used to own it is gone, and a menu needs an
     // anchor, which the strip is the only thing left to give it.
@@ -231,7 +232,7 @@ internal fun BoardStrip(
     PlazaBackHandler(enabled = editing) { editing = false }
 
     Column(
-        Modifier
+        modifier
             .animateContentSize(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             )

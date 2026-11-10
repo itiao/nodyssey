@@ -13,11 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Person
@@ -31,7 +32,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -66,6 +67,8 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.core.Site
 import io.github.nodyssey.data.Board
@@ -88,6 +91,7 @@ import io.github.nodyssey.ui.common.THREAD_ORIGIN_FEED
 import io.github.nodyssey.ui.common.UserNoteTag
 import io.github.nodyssey.ui.common.collectPagesAtRest
 import io.github.nodyssey.ui.common.compactCount
+import io.github.nodyssey.ui.common.glassBar
 import io.github.nodyssey.ui.common.postCardTitleStyle
 import io.github.nodyssey.ui.common.readMarkCardColor
 import io.github.nodyssey.ui.common.readMarkTitleColor
@@ -101,7 +105,7 @@ import io.github.nodyssey.ui.common.shortMessage
 import io.github.nodyssey.ui.common.siteErrorRecovery
 import io.github.nodyssey.ui.common.snackbarDuration
 import io.github.nodyssey.ui.common.webViewUrl
-import io.github.nodyssey.ui.common.withoutBottom
+import io.github.nodyssey.ui.navigation.BottomBarHeight
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.action_scroll_to_top
 import io.github.nodyssey.ui.resources.feed_page_size_note
@@ -120,6 +124,7 @@ import io.github.plaza.designsys.component.PlazaIcons
 import io.github.plaza.designsys.component.PrefetchAvatars
 import io.github.plaza.designsys.component.SkeletonBar
 import io.github.plaza.designsys.component.UserAvatar
+import io.github.plaza.designsys.theme.LocalPlazaLayers
 import io.github.plaza.designsys.theme.PlazaTheme
 import io.github.plaza.designsys.theme.Spacing
 import io.github.plaza.designsys.theme.readableWidth
@@ -494,46 +499,18 @@ fun PostListScreen(
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            /*
-             * The strip is the whole bar now.
-             *
-             * The row above it is gone: 搜索 and 发帖 went down to the bottom bar, 排序 to the strip's
-             * first pill held down, and the wordmark with the site switcher it opened — this app
-             * talks to one site. What is left takes the status-bar inset the header used to, so the
-             * pills sit exactly where they did under it.
-             */
-            Box(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
-                BoardStrip(
-                    boards = state.boards,
-                    parkedBoards = state.parkedBoards,
-                    selectedSlug = state.categorySlug,
-                    // The pill follows the finger: the page the pager is heading for, which moves on
-                    // once a drag has gone a short way towards it (the pager's positional threshold,
-                    // not halfway) and is the destination at once for a tap. The selection itself
-                    // only lands when the swipe settles — see above — and the strip waiting for it
-                    // lit the new pill a beat after the page had arrived. 综合 is a page whose slug
-                    // is null, so only a page that does not exist falls back to the selection.
-                    highlightedSlug =
-                    if (pagerState.targetPage in boards.indices) {
-                        boards[pagerState.targetPage].slug
-                    } else {
-                        state.categorySlug
-                    },
-                    onBoardClick = onBoardClick,
-                    onArrangementChange = onArrangementChange,
-                    sort = state.sort,
-                    onSortChange = onSortChange,
-                )
-            }
-        },
     ) { padding ->
-        // The list runs on under the bottom bar and takes the bar's height as content padding — see
-        // [withoutBottom].
-        val bottomInset = padding.calculateBottomPadding()
+        // Both bars float: the feed keeps the whole window and they sample whatever passes under
+        // them. Their heights go to the list as content padding rather than taking space, which is
+        // also what keeps the last row scrollable clear of the bar.
+        val bottomInset = padding.calculateBottomPadding() + BottomBarHeight
+        var stripHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+        // Its own capture, not the app-wide one: the strip lives *inside* the content the bottom
+        // bar samples, so sharing that state would have the strip blur a snapshot of itself.
+        val stripHaze = rememberHazeState()
         Box(
             Modifier
-                .padding(padding.withoutBottom())
                 .fillMaxSize(),
         ) {
             HorizontalPager(
@@ -541,7 +518,7 @@ fun PostListScreen(
                 // Keyed by board, so parking one or dragging it up the strip moves its page with it
                 // rather than handing its rows to whichever board inherited the index.
                 key = { index -> boards.getOrNull(index)?.slug ?: FRONT_PAGE_KEY },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().hazeSource(stripHaze),
             ) { index ->
                 val board = boards.getOrNull(index) ?: return@HorizontalPager
                 BoardFeed(
@@ -556,6 +533,7 @@ fun PostListScreen(
                     onRecoverInBrowser = onRecoverInBrowser,
                     onBrowseElsewhere = { onBoardClick(null) },
                     navigationBarScrollConnection = navigationBarScrollConnection,
+                    topInset = stripHeight,
                     bottomInset = bottomInset,
                 )
             }
@@ -582,6 +560,37 @@ fun PostListScreen(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(bottom = bottomInset),
+                )
+            }
+
+            // The strip floats over the feed: it is the top of the window now, not a bar that takes
+            // its height out of the list, and what passes under it is what its glass blurs.
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .onSizeChanged { stripHeight = with(density) { it.height.toDp() } }
+                    .glassBar(
+                        state = stripHaze,
+                        shape = RoundedCornerShape(bottomStart = FloatingStripCorner, bottomEnd = FloatingStripCorner),
+                        tint = LocalPlazaLayers.current.page.copy(alpha = 0.74f),
+                    ),
+            ) {
+                BoardStrip(
+                    boards = state.boards,
+                    parkedBoards = state.parkedBoards,
+                    selectedSlug = state.categorySlug,
+                    highlightedSlug =
+                    if (pagerState.targetPage in boards.indices) {
+                        boards[pagerState.targetPage].slug
+                    } else {
+                        state.categorySlug
+                    },
+                    onBoardClick = onBoardClick,
+                    onArrangementChange = onArrangementChange,
+                    sort = state.sort,
+                    onSortChange = onSortChange,
+                    modifier = Modifier.statusBarsPadding(),
                 )
             }
         }
@@ -635,6 +644,8 @@ private fun BoardFeed(
     onRecoverInBrowser: (String) -> Unit,
     onBrowseElsewhere: () -> Unit,
     navigationBarScrollConnection: NavigationBarScrollConnection,
+    /** The floating strip's height, which the first row starts below and later rows scroll under. */
+    topInset: Dp,
     /** The bottom bar's height, which the list scrolls under rather than stopping at. */
     bottomInset: Dp,
 ) {
@@ -712,7 +723,7 @@ private fun BoardFeed(
                     contentPadding = PaddingValues(
                         start = LayerPageGutter,
                         end = LayerPageGutter,
-                        top = Spacing.xs,
+                        top = Spacing.xs + topInset,
                         bottom = FeedBottomClearance + bottomInset,
                     ),
                     verticalArrangement = Arrangement.spacedBy(LayerCardGap),
@@ -783,6 +794,9 @@ private fun FeedPageBar(
         )
     }
 }
+
+/** The radius the floating strip's bottom corners are cut to, matching the bar at the foot. */
+private val FloatingStripCorner = 20.dp
 
 /**
  * What the last row keeps clear of the foot of the list.

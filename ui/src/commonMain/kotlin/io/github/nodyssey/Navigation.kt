@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,12 +53,14 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
+import dev.chrisbanes.haze.rememberHazeState
 import io.github.nodyssey.core.NodeSeekSite
 import io.github.nodyssey.data.NotificationTab
 import io.github.nodyssey.data.session.AccountRepository
 import io.github.nodyssey.data.settings.UserSettings
 import io.github.nodyssey.di.AppContainer
 import io.github.nodyssey.ui.assets.PendingAttendance
+import io.github.nodyssey.ui.common.LocalHazeState
 import io.github.nodyssey.ui.common.LocalOpenNetworkCheck
 import io.github.nodyssey.ui.common.ThreadSharedTransition
 import io.github.nodyssey.ui.common.appName
@@ -67,6 +68,7 @@ import io.github.nodyssey.ui.common.clipboardPostPromptSupported
 import io.github.nodyssey.ui.common.clipboardPostToOffer
 import io.github.nodyssey.ui.common.contentSwipeBack
 import io.github.nodyssey.ui.common.contentSwipeBackSupported
+import io.github.nodyssey.ui.common.glassSource
 import io.github.nodyssey.ui.common.rememberNewClipboardText
 import io.github.nodyssey.ui.common.rememberTouchExplorationEnabled
 import io.github.nodyssey.ui.compare.LocalOpenReportCompare
@@ -705,19 +707,25 @@ fun MainNavigation(
      * The bar still leaves when the feed scrolls down and comes back on a scroll toward the top —
      * [showBottomBar] is that decision, unchanged; only what it shows is.
      */
-    Column(modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f)) { screen() }
-        AnimatedVisibility(visible = showBottomBar) {
-            NodysseyBottomBar(
-                current = currentTab,
-                onSelect = selectTab,
-                unreadCount = notificationsState.counts.all,
-                account = selfAccount,
-                // Both land on the current tab's stack, the way they did from 首页's own bar: 搜索
-                // closes back to the list it was opened from, and 发帖 closes back to it once posted.
-                onSearch = { backStack.add(SearchKey()) },
-                onCreatePost = { backStack.add(PostComposerKey()) },
-            )
+    // The bar floats: the screen keeps the whole window and scrolls under it, and the glass has
+    // something to blur because of it. A `Column` here put the bar beside the content instead, which
+    // is what the glass would have had nothing to sample.
+    val hazeState = rememberHazeState()
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Box(modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().glassSource(hazeState)) { screen() }
+            AnimatedVisibility(visible = showBottomBar, modifier = Modifier.align(Alignment.BottomCenter)) {
+                NodysseyBottomBar(
+                    current = currentTab,
+                    onSelect = selectTab,
+                    unreadCount = notificationsState.counts.all,
+                    account = selfAccount,
+                    // Both land on the current tab's stack, the way they did from 首页's own bar: 搜索
+                    // closes back to the list it was opened from, and 发帖 closes back to it once posted.
+                    onSearch = { backStack.add(SearchKey()) },
+                    onCreatePost = { backStack.add(PostComposerKey()) },
+                )
+            }
         }
     }
 }

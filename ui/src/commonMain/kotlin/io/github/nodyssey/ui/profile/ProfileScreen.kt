@@ -88,6 +88,7 @@ import io.github.nodyssey.ui.common.UpdateDot
 import io.github.nodyssey.ui.common.describedAsLoading
 import io.github.nodyssey.ui.common.siteName
 import io.github.nodyssey.ui.common.withoutBottom
+import io.github.nodyssey.ui.navigation.BottomBarHeight
 import io.github.nodyssey.ui.resources.Res
 import io.github.nodyssey.ui.resources.accounts_switch
 import io.github.nodyssey.ui.resources.accounts_title
@@ -365,7 +366,8 @@ fun ProfileScreen(
         }
         val attendance: @Composable () -> Unit = { AttendanceBanner(state, onAttendance, onAttendanceBoard) }
         val sections = profileSections(destinations, hasUnreadLotteryResults, hasUnreadMail)
-        val bottom = Spacing.lg + padding.calculateBottomPadding()
+        // The bar floats now, so the page has to clear its height as well as the system inset.
+        val bottom = Spacing.lg + padding.calculateBottomPadding() + BottomBarHeight
         // Under the bottom bar rather than stopping at it — see [withoutBottom].
         BoxWithConstraints(Modifier.padding(padding.withoutBottom()).fillMaxSize()) {
             if (maxWidth >= PROFILE_TWO_COLUMN_MIN_WIDTH) {
