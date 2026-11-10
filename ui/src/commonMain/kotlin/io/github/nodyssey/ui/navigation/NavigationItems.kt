@@ -44,6 +44,7 @@ import androidx.navigation3.runtime.NavKey
 import io.github.nodyssey.NotificationsKey
 import io.github.nodyssey.PostListKey
 import io.github.nodyssey.ProfileKey
+import io.github.nodyssey.ui.common.GLASS_TINT_ALPHA
 import io.github.nodyssey.ui.common.LocalHazeState
 import io.github.nodyssey.ui.common.glassBar
 import io.github.nodyssey.ui.postlist.HomeAccount
@@ -125,7 +126,7 @@ fun NodysseyBottomBar(
     // harness and the previews draw the bar on its own, with no feed under it to sample.
     val glass =
         if (haze != null) {
-            Modifier.glassBar(state = haze, shape = shape, tint = LocalPlazaLayers.current.card.copy(alpha = 0.74f))
+            Modifier.glassBar(state = haze, shape = shape, tint = LocalPlazaLayers.current.card.copy(alpha = GLASS_TINT_ALPHA))
         } else {
             Modifier.background(LocalPlazaLayers.current.card)
         }

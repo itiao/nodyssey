@@ -78,6 +78,7 @@ import io.github.nodyssey.model.FeedSort
 import io.github.nodyssey.model.PostSummary
 import io.github.nodyssey.ui.common.BoardTag
 import io.github.nodyssey.ui.common.EmptyFeedState
+import io.github.nodyssey.ui.common.GLASS_TINT_ALPHA
 import io.github.nodyssey.ui.common.JumpDestination
 import io.github.nodyssey.ui.common.LocalThreadTransition
 import io.github.nodyssey.ui.common.NavigationBarScrollConnection
@@ -573,7 +574,7 @@ fun PostListScreen(
                     .glassBar(
                         state = stripHaze,
                         shape = RoundedCornerShape(bottomStart = FloatingStripCorner, bottomEnd = FloatingStripCorner),
-                        tint = LocalPlazaLayers.current.page.copy(alpha = 0.74f),
+                        tint = LocalPlazaLayers.current.page.copy(alpha = GLASS_TINT_ALPHA),
                     ),
             ) {
                 BoardStrip(

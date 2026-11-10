@@ -30,6 +30,15 @@ val LocalHazeState = compositionLocalOf<HazeState?> { null }
 private val GlassBlurRadius = 22.dp
 
 /**
+ * How much of the page colour the glass lays over its blur.
+ *
+ * The other half of the frosted look, and the one worth tuning: too high and the bar is a slab that
+ * happens to be blurred, too low and the icons stop reading against a light row. 0.74 was the first
+ * pass and read as opaque; 0.42 lets the colour of what is passing under show through.
+ */
+const val GLASS_TINT_ALPHA = 0.42f
+
+/**
  * The blur recipe, shared by every glass surface so the strip and the bar are the same glass.
  *
  * Remembered at the call site that owns it: a new style instance per frame would rebuild the effect
